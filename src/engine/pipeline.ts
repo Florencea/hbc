@@ -1,11 +1,14 @@
+import { generateMap, IllegalMoveError, isWithinDropZone } from "./map.ts";
 import { collectAllRaycasts, DIRECTIONS, isValidCoord } from "./raycast.ts";
 import {
   SKILL_SPECS,
   type Action,
   type Board,
   type Coord,
+  type DropZone,
   type GameEvent,
   type GameState,
+  type MapPreset,
   type Piece,
   type Player,
   type ResolutionResult,
@@ -42,12 +45,38 @@ function createDefaultPlayer(id: number, teamId: number, name: string): Player {
   };
 }
 
+export interface CreateInitialStateOptions {
+  boardSize?: number;
+  players?: (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[];
+  mapPreset?: MapPreset;
+}
+
 export function createInitialState(
-  size = 16,
+  optionsOrSize?: number | MapPreset | CreateInitialStateOptions,
   players?: (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[],
+  mapPreset?: MapPreset,
 ): GameState {
-  const initializedPlayers: Player[] = players
-    ? players.map((p) => ({
+  let size = 16;
+  let preset: MapPreset = "CROSSROADS";
+  let rawPlayers:
+    (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[] | undefined =
+    players;
+
+  if (typeof optionsOrSize === "number") {
+    size = optionsOrSize;
+    if (mapPreset) {
+      preset = mapPreset;
+    }
+  } else if (typeof optionsOrSize === "string") {
+    preset = optionsOrSize;
+  } else if (typeof optionsOrSize === "object") {
+    size = optionsOrSize.boardSize ?? 16;
+    preset = optionsOrSize.mapPreset ?? "CROSSROADS";
+    rawPlayers = optionsOrSize.players ?? players;
+  }
+
+  const initializedPlayers: Player[] = rawPlayers
+    ? rawPlayers.map((p) => ({
         id: p.id,
         teamId: p.teamId,
         name: p.name,
@@ -72,42 +101,18 @@ export function createInitialState(
               COUNTER: 0,
             },
         isForcedSpecial: p.isForcedSpecial ?? false,
+        dropZone: p.dropZone ? { ...p.dropZone } : undefined,
       }))
     : [
         createDefaultPlayer(1, 1, "Player 1"),
         createDefaultPlayer(2, 2, "Player 2"),
       ];
 
-  const board: Board = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null),
-  );
+  const { board, dropZones } = generateMap(preset, size, initializedPlayers);
 
-  const mid = Math.floor(size / 2);
-  // Standard center 4 pieces
-  board[mid - 1][mid - 1] = {
-    teamId: 1,
-    playerId: initializedPlayers[0]?.id ?? 1,
-    skillType: "NONE",
-    isRevealed: true,
-  };
-  board[mid - 1][mid] = {
-    teamId: 2,
-    playerId: initializedPlayers[1]?.id ?? 2,
-    skillType: "NONE",
-    isRevealed: true,
-  };
-  board[mid][mid - 1] = {
-    teamId: 2,
-    playerId: initializedPlayers[1]?.id ?? 2,
-    skillType: "NONE",
-    isRevealed: true,
-  };
-  board[mid][mid] = {
-    teamId: 1,
-    playerId: initializedPlayers[0]?.id ?? 1,
-    skillType: "NONE",
-    isRevealed: true,
-  };
+  for (const player of initializedPlayers) {
+    player.dropZone ??= dropZones.get(player.id);
+  }
 
   return {
     board,
@@ -117,7 +122,30 @@ export function createInitialState(
     players: initializedPlayers,
     isGameOver: false,
     winnerTeamId: null,
+    mapPreset: preset,
+    isDropPhase: true,
+    dropTurnsRemaining: initializedPlayers.length * 2,
   };
+}
+
+export function createInitialGame(
+  optionsOrSize?: number | MapPreset | CreateInitialStateOptions,
+  players?: (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[],
+  mapPreset?: MapPreset,
+): { state: GameState; events: GameEvent[] } {
+  const state = createInitialState(optionsOrSize, players, mapPreset);
+  const events: GameEvent[] = [
+    {
+      type: "DROP_PHASE_STARTED",
+      mapPreset: state.mapPreset,
+      players: state.players
+        .filter(
+          (p): p is Player & { dropZone: DropZone } => p.dropZone !== undefined,
+        )
+        .map((p) => ({ playerId: p.id, dropZone: p.dropZone })),
+    },
+  ];
+  return { state, events };
 }
 
 function cloneBoard(board: Board): Board {
@@ -129,6 +157,12 @@ function clonePlayers(players: Player[]): Player[] {
     ...p,
     hand: { ...p.hand },
     charge: { ...p.charge },
+    dropZone: p.dropZone
+      ? {
+          center: { ...p.dropZone.center },
+          radius: p.dropZone.radius,
+        }
+      : undefined,
   }));
 }
 
@@ -190,6 +224,20 @@ export function dispatch(
     const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
     const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
 
+    // Advance drop phase if active
+    let isDropPhase = state.isDropPhase;
+    let dropTurnsRemaining = state.dropTurnsRemaining;
+    if (isDropPhase) {
+      dropTurnsRemaining -= 1;
+      if (dropTurnsRemaining <= 0) {
+        isDropPhase = false;
+        dropTurnsRemaining = 0;
+        events.push({
+          type: "DROP_PHASE_ENDED",
+        });
+      }
+    }
+
     events.push({
       type: "TURN_CHANGED",
       previousPlayerId: action.playerId,
@@ -203,6 +251,9 @@ export function dispatch(
       currentTurn: state.currentTurn + 1,
       activePlayerId: nextPlayer.id,
       players: newPlayers,
+      mapPreset: state.mapPreset,
+      isDropPhase,
+      dropTurnsRemaining,
     };
 
     return { nextState, events };
@@ -211,6 +262,16 @@ export function dispatch(
   // Handle PLACE_PIECE
   if (action.playerId !== state.activePlayerId) {
     throw new Error("Not active player's turn");
+  }
+
+  if (
+    state.isDropPhase &&
+    attacker.dropZone &&
+    !isWithinDropZone(action.coord, attacker.dropZone)
+  ) {
+    throw new IllegalMoveError(
+      "Placement outside assigned drop zone during Drop Phase",
+    );
   }
 
   if (!isValidCoord(state.size, action.coord)) {
@@ -570,6 +631,20 @@ export function dispatch(
   // Turn-end upkeep: charges and skill acquisition for action.playerId
   applyTurnEndUpkeep(attacker, events);
 
+  // Advance drop phase if active
+  let isDropPhase = state.isDropPhase;
+  let dropTurnsRemaining = state.dropTurnsRemaining;
+  if (isDropPhase) {
+    dropTurnsRemaining -= 1;
+    if (dropTurnsRemaining <= 0) {
+      isDropPhase = false;
+      dropTurnsRemaining = 0;
+      events.push({
+        type: "DROP_PHASE_ENDED",
+      });
+    }
+  }
+
   // 6. Advance turn and check game over
   const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
   const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
@@ -600,6 +675,9 @@ export function dispatch(
     players: newPlayers,
     isGameOver,
     winnerTeamId,
+    mapPreset: state.mapPreset,
+    isDropPhase,
+    dropTurnsRemaining,
   };
 
   return { nextState, events };

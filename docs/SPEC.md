@@ -113,5 +113,46 @@ Events are ordered chronologically for rendering VFX, SFX, and match telemetry:
 4. Flip and trap events: `COUNTER_TRIGGERED`, `FLIP_BATCH`, `BOMB_TRIGGERED`
 5. Aura decay: `PURIFY_PULSE`
 6. Economy events: `SKILL_ACQUIRED`, `FORCED_SPECIAL_TRIGGERED`
-7. Turn transition: `TURN_CHANGED`
-8. Game end: `GAME_OVER`
+7. Drop phase events: `DROP_PHASE_ENDED` (or `DROP_PHASE_STARTED` at match setup)
+8. Turn transition: `TURN_CHANGED`
+9. Game end: `GAME_OVER`
+
+---
+
+## 7. Map Templates, Neutral Anchors & Drop Phase (Turn 0 Setup)
+
+Phase 3 introduces procedural board templates, neutral capture anchors, and initial player drop zones to support asymmetrical, quadrant-based, and multi-team battlefields.
+
+### Supported Map Presets
+
+1. **`CROSSROADS`**:
+   - Clustered center anchors forming a 4x4 cross pattern around the center player anchors.
+   - Preserves classic opening moves while guaranteeing neutral anchors adjacent to player drop zones.
+2. **`ARCHIPELAGO`**:
+   - 4 separate 2x2 neutral islands distributed symmetrically across board quadrants.
+   - Player anchors are positioned adjacent to quadrant islands with assigned drop zones covering each island.
+3. **`TRENCHES`**:
+   - Linear neutral anchor paths intersecting perpendicularly across the center of the board.
+   - Player anchors and drop zones are situated at the trench extremities, enabling immediate linear sandwich attacks.
+
+### Neutral Pieces (`teamId: 0`)
+
+- **Capture Target**: Pieces with `teamId: 0` are considered valid enemy capture targets by all teams during raycast checks.
+- **Permanent Conversion**: When neutral pieces are flipped via sandwich, counter reversal, bomb blast, or purify pulse, they permanently convert into the capturing player's faction (`teamId` and `playerId`).
+- **Sandwich Mechanics**: Neutral pieces cannot close a sandwich; only friendly pieces (`piece.teamId === attackerTeamId`) can close an unbroken line of capture.
+
+### Drop Zones & Drop Phase Progression
+
+- **Player Drop Zones**: Each player is assigned an anchor coordinate `center: Coord` and a drop radius `radius: number` (default 3 cells, evaluated using Chebyshev distance `Math.max(|dx|, |dy|) <= radius`).
+- **Playability Guarantee**: Every map preset guarantees that each player's initial drop zone contains their anchor piece and at least one neutral piece, ensuring that the first move is immediately playable.
+- **Drop Phase Restriction**: During the Drop Phase (`isDropPhase === true`, initialized with `dropTurnsRemaining = players.length * 2`):
+  - Placements must fall within the active player's assigned drop zone.
+  - Attempting to place outside this zone throws an `IllegalMoveError`:
+    ```
+    "Placement outside assigned drop zone during Drop Phase"
+    ```
+  - `getLegalMoves` automatically filters candidate coordinates to within the player's drop zone.
+- **Phase Completion**:
+  - Each completed turn (piece placement or pass) decrements `dropTurnsRemaining` by 1.
+  - When `dropTurnsRemaining` reaches 0, `isDropPhase` transitions to `false` and emits a `DROP_PHASE_ENDED` event.
+  - All subsequent turns allow full-board placement according to standard Reversi rules.

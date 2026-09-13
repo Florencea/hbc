@@ -54,6 +54,9 @@ function makeEconomyTestState(
     players,
     isGameOver: false,
     winnerTeamId: null,
+    mapPreset: "CROSSROADS",
+    isDropPhase: false,
+    dropTurnsRemaining: 0,
   };
 }
 

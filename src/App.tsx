@@ -1,18 +1,23 @@
 import { useState } from "react";
 import {
-  createInitialState,
+  createInitialGame,
   dispatch,
   getLegalMoves,
+  isWithinDropZone,
   sanitizeForViewer,
   SKILL_SPECS,
   type Coord,
   type GameEvent,
   type GameState,
+  type MapPreset,
   type Player,
   type SkillType,
 } from "./engine/index.ts";
 
 function getTeamColorClass(teamId: number): string {
+  if (teamId === 0) {
+    return "border-amber-400/80 bg-slate-800 text-amber-300 ring-1 ring-amber-500/40";
+  }
   if (teamId === 1) {
     return "border-sky-300/80 bg-sky-400 text-slate-950";
   }
@@ -20,11 +25,32 @@ function getTeamColorClass(teamId: number): string {
 }
 
 function getTeamName(teamId: number): string {
+  if (teamId === 0) {
+    return "Neutral Anchor";
+  }
   if (teamId === 1) {
     return "Team 1 (Sky)";
   }
   return "Team 2 (Rose)";
 }
+
+const MAP_PRESETS: { preset: MapPreset; label: string; desc: string }[] = [
+  {
+    preset: "CROSSROADS",
+    label: "Crossroads",
+    desc: "Center Cross Anchors",
+  },
+  {
+    preset: "ARCHIPELAGO",
+    label: "Archipelago",
+    desc: "4 Quadrant Islands",
+  },
+  {
+    preset: "TRENCHES",
+    label: "Trenches",
+    desc: "Intersecting Paths",
+  },
+];
 
 interface SkillVisualConfig {
   label: string;
@@ -85,12 +111,15 @@ const SKILL_OPTIONS: { type: SkillType; label: string }[] = [
 ];
 
 export default function App() {
-  const [gameState, setGameState] = useState<GameState>(() =>
-    createInitialState(16),
+  const [selectedPreset, setSelectedPreset] = useState<MapPreset>("CROSSROADS");
+  const [gameState, setGameState] = useState<GameState>(
+    () => createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).state,
   );
   const [selectedSkill, setSelectedSkill] = useState<SkillType>("NONE");
   const [isGodMode, setIsGodMode] = useState<boolean>(true);
-  const [eventLogs, setEventLogs] = useState<GameEvent[]>([]);
+  const [eventLogs, setEventLogs] = useState<GameEvent[]>(
+    () => createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).events,
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const activePlayer: Player | undefined = gameState.players.find(
@@ -184,14 +213,30 @@ export default function App() {
     }
   };
 
+  const handleSelectPreset = (preset: MapPreset) => {
+    setSelectedPreset(preset);
+    const initial = createInitialGame({ mapPreset: preset, boardSize: 16 });
+    setGameState(initial.state);
+    setEventLogs(initial.events);
+    setErrorMsg(null);
+    setSelectedSkill("NONE");
+  };
+
   const handleReset = () => {
-    setGameState(createInitialState(16));
-    setEventLogs([]);
+    const initial = createInitialGame({
+      mapPreset: selectedPreset,
+      boardSize: 16,
+    });
+    setGameState(initial.state);
+    setEventLogs(initial.events);
     setErrorMsg(null);
     setSelectedSkill("NONE");
   };
 
   // Team piece count
+  const neutralCount = gameState.board
+    .flat()
+    .filter((p) => p?.teamId === 0).length;
   const team1Count = gameState.board
     .flat()
     .filter((p) => p?.teamId === 1).length;
@@ -237,12 +282,98 @@ export default function App() {
         </div>
       </header>
 
+      {/* Map Preset Selector Bar */}
+      <section className="mx-auto mb-6 flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 shadow-md">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
+            Map Preset:
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {MAP_PRESETS.map(({ preset, label, desc }) => {
+              const isSelected = selectedPreset === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    handleSelectPreset(preset);
+                  }}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                    isSelected
+                      ? "bg-blue-600 text-white shadow-xs ring-1 ring-blue-400"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span
+                    className={`text-[10px] ${
+                      isSelected ? "text-blue-200" : "text-slate-400"
+                    }`}
+                  >
+                    ({desc})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-slate-800/80 px-2.5 py-1 text-xs text-slate-300">
+            <span className="text-amber-400">⚓ Neutral Anchors:</span>{" "}
+            <span className="font-bold text-white">
+              {neutralCount.toString()}
+            </span>{" "}
+            pcs
+          </span>
+        </div>
+      </section>
+
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left Side: Game Board */}
         <section className="flex flex-col items-center lg:col-span-8">
           {errorMsg && (
             <div className="mb-3 w-full rounded border border-red-800 bg-red-950/80 px-4 py-2 text-xs text-red-300">
               {errorMsg}
+            </div>
+          )}
+
+          {gameState.isDropPhase ? (
+            <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 animate-ping rounded-full bg-amber-400" />
+                <span className="font-bold tracking-wider uppercase">
+                  Drop Phase Active (Turn 0 Setup)
+                </span>
+                <span className="text-slate-300">
+                  Placements restricted to assigned drop zone.
+                </span>
+              </div>
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span>
+                  Drop Turns Rem:{" "}
+                  <strong className="text-amber-300">
+                    {gameState.dropTurnsRemaining.toString()}
+                  </strong>
+                </span>
+                {activePlayer?.dropZone && (
+                  <span className="rounded bg-amber-900/60 px-2 py-0.5 text-amber-200">
+                    Zone ({activePlayer.dropZone.center.x.toString()},{" "}
+                    {activePlayer.dropZone.center.y.toString()}) R=
+                    {activePlayer.dropZone.radius.toString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 flex w-full items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-4 py-1.5 text-xs text-emerald-300">
+              <span className="font-semibold">
+                🌐 Full-Board Phase: Drop restrictions lifted! Standard Reversi
+                rules apply.
+              </span>
+              <span className="text-[11px] text-emerald-400/80">
+                Preset: {gameState.mapPreset}
+              </span>
             </div>
           )}
 
@@ -257,6 +388,10 @@ export default function App() {
                 row.map((piece, x) => {
                   const key = `${x.toString()},${y.toString()}`;
                   const isLegal = legalMoveSet.has(key);
+                  const inDropZone =
+                    gameState.isDropPhase &&
+                    activePlayer?.dropZone &&
+                    isWithinDropZone({ x, y }, activePlayer.dropZone);
 
                   return (
                     <button
@@ -272,6 +407,14 @@ export default function App() {
                         (x + y) % 2 === 0
                           ? "bg-slate-900/90"
                           : "bg-slate-800/70"
+                      } ${
+                        gameState.isDropPhase
+                          ? inDropZone
+                            ? activePlayer.teamId === 1
+                              ? "bg-sky-950/30 ring-1 ring-sky-400/50 ring-inset"
+                              : "bg-rose-950/30 ring-1 ring-rose-400/50 ring-inset"
+                            : "opacity-40"
+                          : ""
                       } hover:bg-slate-700/50`}
                     >
                       {/* Legal Move Marker */}
@@ -290,7 +433,9 @@ export default function App() {
                               : ""
                           }`}
                         >
-                          {SKILL_CONFIG[piece.skillType].code && (
+                          {piece.teamId === 0 ? (
+                            <span className="text-[10px] sm:text-xs">⚓</span>
+                          ) : SKILL_CONFIG[piece.skillType].code ? (
                             <span
                               className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-black sm:h-4 sm:w-4 sm:text-[10px] ${
                                 SKILL_CONFIG[piece.skillType].annotationStyle
@@ -298,7 +443,7 @@ export default function App() {
                             >
                               {SKILL_CONFIG[piece.skillType].code}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       )}
                     </button>
@@ -347,6 +492,49 @@ export default function App() {
               >
                 Pass Turn
               </button>
+            </div>
+
+            {/* Game Phase & Drop Zone Status */}
+            <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
+              <span>Game Phase:</span>
+              <span className="font-semibold text-slate-200">
+                {gameState.isDropPhase ? (
+                  <span className="text-amber-400">
+                    Drop Phase ({gameState.dropTurnsRemaining.toString()} turns
+                    rem)
+                  </span>
+                ) : (
+                  <span className="text-emerald-400">Full-Board Play</span>
+                )}
+              </span>
+            </div>
+
+            {activePlayer?.dropZone && gameState.isDropPhase && (
+              <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Active Drop Zone:</span>
+                <span className="font-mono text-slate-300">
+                  Center ({activePlayer.dropZone.center.x.toString()},{" "}
+                  {activePlayer.dropZone.center.y.toString()}), R=
+                  {activePlayer.dropZone.radius.toString()}
+                </span>
+              </div>
+            )}
+
+            <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2 text-xs text-slate-400">
+              <span>Board Factions:</span>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="font-bold text-sky-300">
+                  {team1Count.toString()} Sky
+                </span>
+                <span className="text-slate-600">/</span>
+                <span className="font-bold text-rose-300">
+                  {team2Count.toString()} Rose
+                </span>
+                <span className="text-slate-600">/</span>
+                <span className="font-bold text-amber-400">
+                  {neutralCount.toString()} Neutral
+                </span>
+              </div>
             </div>
           </div>
 
@@ -728,6 +916,16 @@ export default function App() {
                       <span className="font-semibold text-blue-400">
                         {ev.type}
                       </span>
+                      {ev.type === "DROP_PHASE_STARTED" && (
+                        <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                          Preset: {ev.mapPreset}
+                        </span>
+                      )}
+                      {ev.type === "DROP_PHASE_ENDED" && (
+                        <span className="rounded border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+                          Full-Board Active
+                        </span>
+                      )}
                     </div>
                     <span className="text-[11px] text-slate-400">
                       {JSON.stringify(ev)}

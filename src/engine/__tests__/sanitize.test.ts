@@ -101,6 +101,9 @@ describe("sanitizeForViewer (Fog of War)", () => {
     ],
     isGameOver: false,
     winnerTeamId: null,
+    mapPreset: "CROSSROADS",
+    isDropPhase: false,
+    dropTurnsRemaining: 0,
   };
 
   it("hides unrevealed enemy skill types from opponent perspective", () => {

@@ -1,3 +1,4 @@
+import { isWithinDropZone } from "./map.ts";
 import type {
   Board,
   Coord,
@@ -124,6 +125,14 @@ export function getLegalMoves(
   for (let y = 0; y < state.size; y++) {
     for (let x = 0; x < state.size; x++) {
       if (state.board[y]?.[x] !== null) continue;
+
+      if (
+        state.isDropPhase &&
+        player.dropZone &&
+        !isWithinDropZone({ x, y }, player.dropZone)
+      ) {
+        continue;
+      }
 
       const hasCapture = DIRECTIONS.some((direction) => {
         const result = traceRay(

@@ -27,6 +27,13 @@ export interface Piece {
 
 export type Board = (Piece | null)[][];
 
+export type MapPreset = "CROSSROADS" | "ARCHIPELAGO" | "TRENCHES";
+
+export interface DropZone {
+  center: Coord;
+  radius: number;
+}
+
 export interface Player {
   id: number;
   teamId: number;
@@ -34,6 +41,7 @@ export interface Player {
   hand: Record<SkillType, number>;
   charge: Record<SkillType, number>;
   isForcedSpecial: boolean;
+  dropZone?: DropZone;
 }
 
 export interface GameState {
@@ -44,6 +52,9 @@ export interface GameState {
   players: Player[];
   isGameOver: boolean;
   winnerTeamId: number | null;
+  mapPreset: MapPreset;
+  isDropPhase: boolean;
+  dropTurnsRemaining: number;
 }
 
 export interface MaskedPiece {
@@ -62,6 +73,9 @@ export interface MaskedGameState {
   players: Player[];
   isGameOver: boolean;
   winnerTeamId: number | null;
+  mapPreset: MapPreset;
+  isDropPhase: boolean;
+  dropTurnsRemaining: number;
 }
 
 export type GameEvent =
@@ -139,6 +153,14 @@ export type GameEvent =
   | {
       type: "GAME_OVER";
       winnerTeamId: number | null;
+    }
+  | {
+      type: "DROP_PHASE_STARTED";
+      mapPreset: MapPreset;
+      players: { playerId: number; dropZone: DropZone }[];
+    }
+  | {
+      type: "DROP_PHASE_ENDED";
     };
 
 export interface ResolutionResult {
