@@ -168,20 +168,20 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
 
   it("bomb_chains_bomb: BOMB 3x3 blast hits second BOMB -> triggers second 3x3 blast sequentially", () => {
     const board = createEmptyBoard(16);
-    // Attacker Team 1 at (2, 2)
-    // (3, 2) is Team 2 BOMB (hidden); (4, 2) is Team 1 NONE
-    board[2][3] = makePiece(2, 2, "BOMB", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    // Attacker Team 2 at (2, 2)
+    // (3, 2) is Team 1 BOMB (hidden); (4, 2) is Team 2 NONE
+    board[2][3] = makePiece(1, 1, "BOMB", false);
+    board[2][4] = makePiece(2, 2, "NONE");
 
-    // Inside 3x3 blast of BOMB 1, place BOMB 2 at (4, 3) [Team 2 BOMB]
-    board[3][4] = makePiece(2, 2, "BOMB", false);
+    // Inside 3x3 blast of BOMB 1, place BOMB 2 at (4, 3) [Team 1 BOMB]
+    board[3][4] = makePiece(1, 1, "BOMB", false);
     // Inside 3x3 blast of BOMB 2, place another piece at (5, 4) [Team 2 NONE]
     board[4][5] = makePiece(2, 2, "NONE");
 
-    const state = makeTestState(board, 1);
+    const state = makeTestState(board, 2);
     const { nextState, events } = resolveAction(state, {
       type: "PLACE_PIECE",
-      playerId: 1,
+      playerId: 2,
       coord: { x: 2, y: 2 },
       skillType: "NONE",
     });
@@ -190,17 +190,23 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const bombEvents = events.filter((e) => e.type === "BOMB_TRIGGERED");
     expect(bombEvents.length).toBe(2);
 
-    // First bomb triggered at (3, 2)
+    // First bomb triggered at (3, 2) for Team 1
     expect(bombEvents[0]?.coord).toEqual({ x: 3, y: 2 });
-    // Second bomb triggered at (4, 3)
-    expect(bombEvents[1]?.coord).toEqual({ x: 4, y: 3 });
+    expect(bombEvents[0]?.teamId).toBe(1);
 
-    // Both bombs consumed to NONE and converted to Team 1
+    // Second bomb triggered at (4, 3) for Team 1
+    expect(bombEvents[1]?.coord).toEqual({ x: 4, y: 3 });
+    expect(bombEvents[1]?.teamId).toBe(1);
+
+    // Both bombs consumed to NONE and belong to Team 1
     expect(nextState.board[2]?.[3]?.skillType).toBe("NONE");
     expect(nextState.board[2]?.[3]?.teamId).toBe(1);
 
     expect(nextState.board[3]?.[4]?.skillType).toBe("NONE");
     expect(nextState.board[3]?.[4]?.teamId).toBe(1);
+
+    // Placed piece of Team 2 at (2, 2) caught in BOMB 1 blast converted to Team 1
+    expect(nextState.board[2]?.[2]?.teamId).toBe(1);
 
     // Piece at (5, 4) hit by second bomb converted to Team 1
     expect(nextState.board[4]?.[5]?.teamId).toBe(1);
@@ -281,5 +287,50 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     });
     // Turn 3 upkeep applied: duration <= 0, self-dissolves to NONE
     expect(turn3.nextState.board[5]?.[5]?.skillType).toBe("NONE");
+  });
+
+  it("user_scenario_team1_bomb_triggers_for_team1_when_flipped_by_team2: When Team 2 flips Team 1's BOMB at (9, 7), it explodes for Team 1", () => {
+    const board = createEmptyBoard(16);
+    // Setup exact board state from user's event log:
+    // (8, 7) Team 1 NONE
+    board[7][8] = makePiece(1, 1, "NONE");
+    // (9, 7) Team 1 BOMB (unrevealed)
+    board[7][9] = makePiece(1, 1, "BOMB", false);
+    // (9, 8) Team 2 NONE
+    board[8][9] = makePiece(2, 2, "NONE");
+    // (8, 8) Team 2 NONE
+    board[8][8] = makePiece(2, 2, "NONE");
+
+    // Player 2 plays at (9, 6), which flanks (9, 7) [Team 1 BOMB] against (9, 8) [Team 2]
+    const state = makeTestState(board, 2);
+    const { nextState, events } = resolveAction(state, {
+      type: "PLACE_PIECE",
+      playerId: 2,
+      coord: { x: 9, y: 6 },
+      skillType: "NONE",
+    });
+
+    const bombEvent = events.find((e) => e.type === "BOMB_TRIGGERED");
+    expect(bombEvent).toBeDefined();
+
+    // The BOMB at (9, 7) belonged to Team 1, so it must detonate FOR Team 1
+    if (bombEvent?.type === "BOMB_TRIGGERED") {
+      expect(bombEvent.coord).toEqual({ x: 9, y: 7 });
+      expect(bombEvent.teamId).toBe(1);
+      expect(bombEvent.factionId).toBe(1);
+    }
+
+    // Surrounding pieces in 3x3 of (9, 7) converted to Team 1:
+    // Placed piece (9, 6) converted to Team 1
+    expect(nextState.board[6]?.[9]?.teamId).toBe(1);
+    // (9, 7) BOMB itself consumed to NONE and is Team 1
+    expect(nextState.board[7]?.[9]?.teamId).toBe(1);
+    expect(nextState.board[7]?.[9]?.skillType).toBe("NONE");
+    // (8, 7) remains Team 1
+    expect(nextState.board[7]?.[8]?.teamId).toBe(1);
+    // (9, 8) converted to Team 1
+    expect(nextState.board[8]?.[9]?.teamId).toBe(1);
+    // (8, 8) converted to Team 1
+    expect(nextState.board[8]?.[8]?.teamId).toBe(1);
   });
 });

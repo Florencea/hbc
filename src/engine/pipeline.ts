@@ -347,11 +347,11 @@ export function dispatch(
         currentPiece.teamId = attacker.teamId;
         currentPiece.playerId = attacker.id;
 
-        // If flipped piece was a BOMB, trigger explosion with triggering faction = attacker.teamId
+        // If flipped piece was a BOMB, trigger explosion with its own faction
         if (originalPiece.skillType === "BOMB") {
           const key = `${c.x.toString()},${c.y.toString()}`;
           if (!processedBombs.has(key)) {
-            bombQueue.push({ coord: c, teamId: attacker.teamId });
+            bombQueue.push({ coord: c, teamId: originalPiece.teamId });
             processedBombs.add(key);
           }
         }
