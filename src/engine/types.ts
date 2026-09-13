@@ -86,6 +86,12 @@ export type GameEvent =
       piece: Piece;
     }
   | {
+      type: "PIONEER_PLACED";
+      coord: Coord;
+      playerId: number;
+      piece: Piece;
+    }
+  | {
       type: "RAYCAST_BLOCKED";
       coord: Coord;
       pos?: Coord;
@@ -186,4 +192,10 @@ export interface RaycastResult {
   isBlockedByWall: boolean;
   blockedCoord?: Coord;
   penetratedWallCoords: Coord[];
+}
+
+export interface AvailableMoves {
+  standardMoves: Coord[];
+  pioneerMoves: Coord[];
+  isPioneerActive: boolean;
 }

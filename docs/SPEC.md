@@ -156,3 +156,37 @@ Phase 3 introduces procedural board templates, neutral capture anchors, and init
   - Each completed turn (piece placement or pass) decrements `dropTurnsRemaining` by 1.
   - When `dropTurnsRemaining` reaches 0, `isDropPhase` transitions to `false` and emits a `DROP_PHASE_ENDED` event.
   - All subsequent turns allow full-board placement according to standard Reversi rules.
+
+---
+
+## 8. Pioneer Placement (開拓落子 / Bridge Step)
+
+To solve the "island isolation / gridlock" issue on sparse and sprawling battlefield maps (such as `ARCHIPELAGO` and `TRENCHES`) where players run out of legal sandwich moves before reaching an opponent:
+
+### Trigger Conditions
+
+1. The active player has **0 legal sandwich captures** on the board (`getLegalMoves(state, activePlayerId, skillType).length === 0`).
+2. The game is not over (`!state.isGameOver`).
+3. Under these conditions, the active player enters the **Pioneer Phase** (`isPioneerActive = true`), allowing them to build territorial bridges across open space instead of being forced to pass.
+
+### Move Legality & Reachability
+
+- **No Capture Required**: A Pioneer placement does not require sandwiching or capturing opposing or neutral pieces.
+- **Empty Cell Target**: The target coordinate `(x, y)` must be an empty cell (`board[y][x] === null`).
+- **Territorial Proximity**: The target coordinate must be within **Chebyshev distance \(\le 2\)** (`Math.max(|dx|, |dy|) <= 2`) of **any friendly piece** (`piece.teamId === activePlayer.teamId`).
+- **Drop Phase Constraints**: If the game is in Drop Phase (`isDropPhase === true`), placements must also be within the player's assigned drop zone (`isWithinDropZone(coord, player.dropZone)`).
+
+### Execution & Event Flow
+
+1. Placing a pioneer piece places the piece on the board and emits:
+   - `PIECE_PLACED`
+   - `PIONEER_PLACED`: `{ type: "PIONEER_PLACED", coord: Coord, playerId: number, piece: Piece }`
+2. If `PURIFY` is played as a pioneer piece:
+   - Emits `PIECE_REVEALED` (`reason: "AURA"`).
+   - At turn end, emits a 3x3 `PURIFY_PULSE`, converting adjacent opposing pieces.
+3. No `FLIP_BATCH` is emitted since no sandwich capture occurred.
+4. Normal turn-end upkeep is applied (energy charges, cooldown replenishment, drop turn decrement, turn change).
+
+### Pass Fallback
+
+If a player has 0 standard captures and 0 pioneer moves (e.g. completely surrounded or no friendly pieces), the player must pass their turn (`PASS_TURN`).

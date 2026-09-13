@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   createInitialGame,
   dispatch,
-  getLegalMoves,
+  getAvailableMoves,
   isWithinDropZone,
   sanitizeForViewer,
   SKILL_SPECS,
@@ -133,14 +133,21 @@ export default function App() {
   const player1 = displayedState.players.find((p) => p.teamId === 1);
   const player2 = displayedState.players.find((p) => p.teamId === 2);
 
-  const legalMoves = getLegalMoves(
+  const availableMoves = getAvailableMoves(
     gameState,
     gameState.activePlayerId,
     selectedSkill,
   );
 
-  const legalMoveSet = new Set(
-    legalMoves.map((m) => `${m.x.toString()},${m.y.toString()}`),
+  const standardMoveSet = new Set(
+    availableMoves.standardMoves.map(
+      (m) => `${m.x.toString()},${m.y.toString()}`,
+    ),
+  );
+  const pioneerMoveSet = new Set(
+    availableMoves.pioneerMoves.map(
+      (m) => `${m.x.toString()},${m.y.toString()}`,
+    ),
   );
 
   const handleCellClick = (coord: Coord) => {
@@ -377,6 +384,24 @@ export default function App() {
             </div>
           )}
 
+          {availableMoves.isPioneerActive && (
+            <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/50 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 animate-ping rounded-full bg-amber-400" />
+                <span className="font-bold tracking-wider uppercase">
+                  Pioneer Phase Active:
+                </span>
+                <span>
+                  No capture moves available. Place a bridge piece within 2
+                  tiles of your territory.
+                </span>
+              </div>
+              <span className="rounded bg-amber-900/60 px-2 py-0.5 font-mono text-[11px] text-amber-300">
+                {availableMoves.pioneerMoves.length.toString()} bridge targets
+              </span>
+            </div>
+          )}
+
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl">
             <div
               className="grid gap-0.5 rounded bg-slate-800/60 p-0.5"
@@ -387,7 +412,9 @@ export default function App() {
               {displayedState.board.map((row, y) =>
                 row.map((piece, x) => {
                   const key = `${x.toString()},${y.toString()}`;
-                  const isLegal = legalMoveSet.has(key);
+                  const isStandardLegal = standardMoveSet.has(key);
+                  const isPioneerLegal = pioneerMoveSet.has(key);
+                  const isLegal = isStandardLegal || isPioneerLegal;
                   const inDropZone =
                     gameState.isDropPhase &&
                     activePlayer?.dropZone &&
@@ -418,8 +445,11 @@ export default function App() {
                       } hover:bg-slate-700/50`}
                     >
                       {/* Legal Move Marker */}
-                      {isLegal && piece === null && (
+                      {piece === null && isStandardLegal && (
                         <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400/50" />
+                      )}
+                      {piece === null && isPioneerLegal && (
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400/80 ring-2 ring-amber-400/30" />
                       )}
 
                       {/* Piece Representation */}
@@ -919,6 +949,12 @@ export default function App() {
                       {ev.type === "DROP_PHASE_STARTED" && (
                         <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
                           Preset: {ev.mapPreset}
+                        </span>
+                      )}
+                      {ev.type === "PIONEER_PLACED" && (
+                        <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                          Pioneer Bridge ({ev.coord.x.toString()},{" "}
+                          {ev.coord.y.toString()})
                         </span>
                       )}
                       {ev.type === "DROP_PHASE_ENDED" && (

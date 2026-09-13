@@ -1,5 +1,6 @@
-import { isWithinDropZone } from "./map.ts";
+import { getDistance, isWithinDropZone } from "./map.ts";
 import type {
+  AvailableMoves,
   Board,
   Coord,
   GameState,
@@ -153,4 +154,78 @@ export function getLegalMoves(
   }
 
   return legalMoves;
+}
+
+export function getPioneerMoves(state: GameState, playerId: number): Coord[] {
+  if (state.isGameOver) return [];
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return [];
+
+  const friendlyCoords: Coord[] = [];
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const piece = state.board[y]?.[x];
+      if (piece?.teamId === player.teamId) {
+        friendlyCoords.push({ x, y });
+      }
+    }
+  }
+
+  if (friendlyCoords.length === 0) return [];
+
+  const pioneerMoves: Coord[] = [];
+
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      if (state.board[y]?.[x] !== null) continue;
+
+      if (
+        state.isDropPhase &&
+        player.dropZone &&
+        !isWithinDropZone({ x, y }, player.dropZone)
+      ) {
+        continue;
+      }
+
+      const isNearFriendly = friendlyCoords.some(
+        (c) => getDistance({ x, y }, c) <= 2,
+      );
+
+      if (isNearFriendly) {
+        pioneerMoves.push({ x, y });
+      }
+    }
+  }
+
+  return pioneerMoves;
+}
+
+export function getAvailableMoves(
+  state: GameState,
+  playerId: number,
+  skillType: SkillType = "NONE",
+): AvailableMoves {
+  if (state.isGameOver) {
+    return {
+      standardMoves: [],
+      pioneerMoves: [],
+      isPioneerActive: false,
+    };
+  }
+
+  const standardMoves = getLegalMoves(state, playerId, skillType);
+  if (standardMoves.length > 0) {
+    return {
+      standardMoves,
+      pioneerMoves: [],
+      isPioneerActive: false,
+    };
+  }
+
+  const pioneerMoves = getPioneerMoves(state, playerId);
+  return {
+    standardMoves: [],
+    pioneerMoves,
+    isPioneerActive: true,
+  };
 }

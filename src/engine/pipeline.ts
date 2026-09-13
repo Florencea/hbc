@@ -1,5 +1,11 @@
 import { generateMap, IllegalMoveError, isWithinDropZone } from "./map.ts";
-import { collectAllRaycasts, DIRECTIONS, isValidCoord } from "./raycast.ts";
+import {
+  collectAllRaycasts,
+  DIRECTIONS,
+  getLegalMoves,
+  getPioneerMoves,
+  isValidCoord,
+} from "./raycast.ts";
 import {
   SKILL_SPECS,
   type Action,
@@ -289,8 +295,6 @@ export function dispatch(
     if (attacker.hand[action.skillType] <= 0) {
       throw new Error("Player does not have this skill in hand");
     }
-    attacker.hand[action.skillType] -= 1;
-    attacker.isForcedSpecial = false;
   }
 
   if (attacker.isForcedSpecial && attackerSkill === "NONE") {
@@ -299,7 +303,98 @@ export function dispatch(
 
   const isPurify = attackerSkill === "PURIFY";
 
-  // 1. Place piece
+  // Trace raycasts to check captures
+  const raycasts = collectAllRaycasts(
+    state.board,
+    state.size,
+    action.coord,
+    attacker.teamId,
+    attackerSkill,
+  );
+
+  // Collect all unique captured coordinates
+  const capturedMap = new Map<string, Coord>();
+  for (const ray of raycasts) {
+    for (const c of ray.capturedCoords) {
+      capturedMap.set(`${c.x.toString()},${c.y.toString()}`, c);
+    }
+  }
+  const capturedCoords: Coord[] = [...capturedMap.values()];
+
+  if (capturedCoords.length === 0) {
+    const standardMoves = getLegalMoves(state, action.playerId, attackerSkill);
+    if (standardMoves.length > 0) {
+      throw new IllegalMoveError(
+        "Illegal move: must capture at least one piece",
+      );
+    }
+
+    const pioneerMoves = getPioneerMoves(state, action.playerId);
+    const isValidPioneer = pioneerMoves.some(
+      (c) => c.x === action.coord.x && c.y === action.coord.y,
+    );
+
+    if (!isValidPioneer) {
+      throw new IllegalMoveError(
+        "Illegal pioneer move: target must be within 2 tiles of friendly territory",
+      );
+    }
+
+    // Deduct skill if special piece
+    if (action.skillType && action.skillType !== "NONE") {
+      attacker.hand[action.skillType] -= 1;
+      attacker.isForcedSpecial = false;
+    }
+
+    // Place pioneer piece
+    const newPiece: Piece = {
+      teamId: attacker.teamId,
+      playerId: attacker.id,
+      skillType: attackerSkill,
+      isRevealed: isPurify || attackerSkill === "NONE",
+      duration: isPurify ? 3 : undefined,
+    };
+    newBoard[action.coord.y][action.coord.x] = newPiece;
+
+    events.push({
+      type: "PIECE_PLACED",
+      coord: action.coord,
+      piece: { ...newPiece },
+    });
+
+    events.push({
+      type: "PIONEER_PLACED",
+      coord: action.coord,
+      playerId: action.playerId,
+      piece: { ...newPiece },
+    });
+
+    if (isPurify) {
+      events.push({
+        type: "PIECE_REVEALED",
+        coord: action.coord,
+        skillType: "PURIFY",
+        reason: "AURA",
+      });
+    }
+
+    return finalizePlacementTurn(
+      state,
+      newBoard,
+      newPlayers,
+      attacker,
+      action.playerId,
+      events,
+    );
+  }
+
+  // Deduct skill for standard move
+  if (action.skillType && action.skillType !== "NONE") {
+    attacker.hand[action.skillType] -= 1;
+    attacker.isForcedSpecial = false;
+  }
+
+  // 1. Place piece for standard move
   const newPiece: Piece = {
     teamId: attacker.teamId,
     playerId: attacker.id,
@@ -324,15 +419,7 @@ export function dispatch(
     });
   }
 
-  // 2. Trace raycasts
-  const raycasts = collectAllRaycasts(
-    state.board,
-    state.size,
-    action.coord,
-    attacker.teamId,
-    attackerSkill,
-  );
-
+  // 2. Trace raycast blockage / penetration events
   for (const ray of raycasts) {
     if (ray.isBlockedByWall && ray.blockedCoord) {
       const wallPiece = newBoard[ray.blockedCoord.y]?.[ray.blockedCoord.x];
@@ -368,19 +455,6 @@ export function dispatch(
         reason: "PENETRATE",
       });
     }
-  }
-
-  // Collect all unique captured coordinates
-  const capturedMap = new Map<string, Coord>();
-  for (const ray of raycasts) {
-    for (const c of ray.capturedCoords) {
-      capturedMap.set(`${c.x.toString()},${c.y.toString()}`, c);
-    }
-  }
-  const capturedCoords: Coord[] = [...capturedMap.values()];
-
-  if (capturedCoords.length === 0) {
-    throw new Error("Illegal move: must capture at least one piece");
   }
 
   // 3. Phase 2: Black Counter Check
@@ -625,7 +699,25 @@ export function dispatch(
     });
   }
 
-  // 5. Apply turn-end PURIFY pulses
+  return finalizePlacementTurn(
+    state,
+    newBoard,
+    newPlayers,
+    attacker,
+    action.playerId,
+    events,
+  );
+}
+
+function finalizePlacementTurn(
+  state: GameState,
+  newBoard: Board,
+  newPlayers: Player[],
+  attacker: Player,
+  actionPlayerId: number,
+  events: GameEvent[],
+): { nextState: GameState; events: GameEvent[] } {
+  // Apply turn-end PURIFY pulses
   applyPurifyPulses(newBoard, state.size, events);
 
   // Turn-end upkeep: charges and skill acquisition for action.playerId
@@ -645,13 +737,13 @@ export function dispatch(
     }
   }
 
-  // 6. Advance turn and check game over
-  const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
+  // Advance turn and check game over
+  const activeIdx = newPlayers.findIndex((p) => p.id === actionPlayerId);
   const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
 
   events.push({
     type: "TURN_CHANGED",
-    previousPlayerId: action.playerId,
+    previousPlayerId: actionPlayerId,
     nextPlayerId: nextPlayer.id,
     turn: state.currentTurn + 1,
   });
