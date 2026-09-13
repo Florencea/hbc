@@ -1,18 +1,34 @@
 import { useState } from "react";
 import {
+  BoardOverlay,
+  type AuraPulseEffect,
+  type BlastWaveEffect,
+  type PioneerBridgeEffect,
+  type ShieldRippleEffect,
+} from "./components/BoardOverlay.tsx";
+import {
+  FloatingCombatText,
+  type CombatTextItem,
+} from "./components/FloatingCombatText.tsx";
+import {
   createInitialGame,
   dispatch,
   getAvailableMoves,
   isWithinDropZone,
   sanitizeForViewer,
   SKILL_SPECS,
+  type Board,
   type Coord,
   type GameEvent,
   type GameState,
   type MapPreset,
+  type MaskedPiece,
+  type Piece,
   type Player,
   type SkillType,
 } from "./engine/index.ts";
+import { playEvents } from "./fx/choreography.ts";
+import { isAudioMuted, toggleAudioMuted } from "./fx/sound.ts";
 
 function getTeamColorClass(teamId: number): string {
   if (teamId === 0) {
@@ -32,6 +48,17 @@ function getTeamName(teamId: number): string {
     return "Team 1 (Sky)";
   }
   return "Team 2 (Rose)";
+}
+
+function getLegalMarkerClass(teamId: number, isPioneer: boolean): string {
+  if (isPioneer) {
+    return teamId === 1
+      ? "h-2.5 w-2.5 animate-pulse rounded-full bg-sky-400 ring-2 ring-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+      : "h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 ring-2 ring-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]";
+  }
+  return teamId === 1
+    ? "h-2.5 w-2.5 animate-pulse rounded-full bg-sky-400 ring-2 ring-sky-300/70 shadow-[0_0_8px_rgba(56,189,248,0.7)]"
+    : "h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500 ring-2 ring-rose-300/70 shadow-[0_0_8px_rgba(244,63,94,0.7)]";
 }
 
 const MAP_PRESETS: { preset: MapPreset; label: string; desc: string }[] = [
@@ -110,6 +137,41 @@ const SKILL_OPTIONS: { type: SkillType; label: string }[] = [
   { type: "COUNTER", label: "Counter (Purple)" },
 ];
 
+/**
+ * Priority order when forced special is triggered:
+ * Furthest down the list, longest cooldown, most powerful:
+ * COUNTER (CD 5) -> PURIFY (CD 4) -> WALL (CD 3) -> BOMB (CD 2) -> PIERCE (CD 2)
+ */
+const FORCED_SPECIAL_PRIORITY: Exclude<SkillType, "NONE">[] = [
+  "COUNTER",
+  "PURIFY",
+  "WALL",
+  "BOMB",
+  "PIERCE",
+];
+
+function getNextSelectedSkill(
+  nextState: GameState,
+  currentSkill: SkillType,
+): SkillType {
+  const incomingPlayer = nextState.players.find(
+    (p) => p.id === nextState.activePlayerId,
+  );
+  if (!incomingPlayer) return currentSkill;
+
+  if (incomingPlayer.isForcedSpecial) {
+    // Automatically pre-select the skill further down the list / highest CD / most powerful
+    const preferred = FORCED_SPECIAL_PRIORITY.find(
+      (sk) => incomingPlayer.hand[sk] > 0,
+    );
+    return preferred ?? "NONE";
+  }
+  if (currentSkill !== "NONE" && incomingPlayer.hand[currentSkill] <= 0) {
+    return "NONE";
+  }
+  return currentSkill;
+}
+
 export default function App() {
   const [selectedPreset, setSelectedPreset] = useState<MapPreset>("CROSSROADS");
   const [gameState, setGameState] = useState<GameState>(
@@ -117,26 +179,87 @@ export default function App() {
   );
   const [selectedSkill, setSelectedSkill] = useState<SkillType>("NONE");
   const [isGodMode, setIsGodMode] = useState<boolean>(true);
+  const [isMuted, setIsMuted] = useState<boolean>(() => isAudioMuted());
   const [eventLogs, setEventLogs] = useState<GameEvent[]>(
     () => createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).events,
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Animation and Visual FX states
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
+  const [intermediateBoard, setIntermediateBoard] = useState<Board | null>(
+    null,
+  );
+  const [flippingCoords, setFlippingCoords] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [poppingCoord, setPoppingCoord] = useState<Coord | null>(null);
+  const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
+  const [screenFlash, setScreenFlash] = useState<string | null>(null);
+  const [floatingTexts, setFloatingTexts] = useState<CombatTextItem[]>([]);
+  const [blastWaves, setBlastWaves] = useState<BlastWaveEffect[]>([]);
+  const [auraPulses, setAuraPulses] = useState<AuraPulseEffect[]>([]);
+  const [shieldRipples, setShieldRipples] = useState<ShieldRippleEffect[]>([]);
+  const [pioneerBridges, setPioneerBridges] = useState<PioneerBridgeEffect[]>(
+    [],
+  );
+
   const activePlayer: Player | undefined = gameState.players.find(
     (p) => p.id === gameState.activePlayerId,
   );
+
+  // Resolve effective skill: if in forced special, auto-select highest CD / furthest skill if current is NONE or out of stock
+  const effectiveSkill: SkillType = (() => {
+    if (activePlayer?.isForcedSpecial) {
+      if (selectedSkill !== "NONE" && activePlayer.hand[selectedSkill] > 0) {
+        return selectedSkill;
+      }
+      const preferred = FORCED_SPECIAL_PRIORITY.find(
+        (sk) => activePlayer.hand[sk] > 0,
+      );
+      return preferred ?? "NONE";
+    }
+    return selectedSkill;
+  })();
 
   const displayedState = isGodMode
     ? gameState
     : sanitizeForViewer(gameState, gameState.activePlayerId);
 
+  const currentBoard: (Piece | MaskedPiece | null)[][] = intermediateBoard
+    ? isGodMode
+      ? intermediateBoard
+      : intermediateBoard.map((row) =>
+          row.map((piece) => {
+            if (!piece) return null;
+            if (piece.isRevealed) return piece;
+            if (piece.teamId === activePlayer?.teamId) return piece;
+            return { ...piece, skillType: "NONE" };
+          }),
+        )
+    : displayedState.board;
+
   const player1 = displayedState.players.find((p) => p.teamId === 1);
   const player2 = displayedState.players.find((p) => p.teamId === 2);
+
+  const player1SpecialsCount =
+    (player1?.hand.WALL ?? 0) +
+    (player1?.hand.PIERCE ?? 0) +
+    (player1?.hand.BOMB ?? 0) +
+    (player1?.hand.PURIFY ?? 0) +
+    (player1?.hand.COUNTER ?? 0);
+
+  const player2SpecialsCount =
+    (player2?.hand.WALL ?? 0) +
+    (player2?.hand.PIERCE ?? 0) +
+    (player2?.hand.BOMB ?? 0) +
+    (player2?.hand.PURIFY ?? 0) +
+    (player2?.hand.COUNTER ?? 0);
 
   const availableMoves = getAvailableMoves(
     gameState,
     gameState.activePlayerId,
-    selectedSkill,
+    effectiveSkill,
   );
 
   const standardMoveSet = new Set(
@@ -150,35 +273,221 @@ export default function App() {
     ),
   );
 
+  const executeEventChoreography = async (
+    nextState: GameState,
+    events: GameEvent[],
+  ) => {
+    if (events.length === 0) {
+      setGameState(nextState);
+      setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev));
+      return;
+    }
+
+    setIsAnimating(true);
+    let currentIntermediateBoard: Board = gameState.board.map((row) =>
+      row.map((cell) => (cell ? { ...cell } : null)),
+    );
+    setIntermediateBoard(currentIntermediateBoard);
+
+    try {
+      await playEvents(events, {
+        onPiecePlaced: (pos, piece) => {
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) =>
+              rX === pos.x && rY === pos.y ? { ...piece } : cell,
+            ),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+          setPoppingCoord(pos);
+          setTimeout(() => {
+            setPoppingCoord(null);
+          }, 180);
+        },
+        onPioneerPlaced: (pos, piece) => {
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) =>
+              rX === pos.x && rY === pos.y ? { ...piece } : cell,
+            ),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+          setPoppingCoord(pos);
+          setTimeout(() => {
+            setPoppingCoord(null);
+          }, 180);
+
+          let closest: Coord | null = null;
+          let minDistance = Infinity;
+          for (let y = 0; y < gameState.size; y++) {
+            for (let x = 0; x < gameState.size; x++) {
+              if (x === pos.x && y === pos.y) continue;
+              const p = currentIntermediateBoard[y][x];
+              if (p?.teamId === piece.teamId) {
+                const d = Math.max(Math.abs(x - pos.x), Math.abs(y - pos.y));
+                if (d < minDistance) {
+                  minDistance = d;
+                  closest = { x, y };
+                }
+              }
+            }
+          }
+          if (closest) {
+            const bridgeId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setPioneerBridges((prev) => [
+              ...prev,
+              { id: bridgeId, from: pos, to: closest },
+            ]);
+            setTimeout(() => {
+              setPioneerBridges((prev) =>
+                prev.filter((b) => b.id !== bridgeId),
+              );
+            }, 800);
+          }
+        },
+        onPieceRevealed: (pos, skillType) => {
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) =>
+              rX === pos.x && rY === pos.y && cell
+                ? { ...cell, skillType, isRevealed: true }
+                : cell,
+            ),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+        },
+        onPieceFlip: (pos, toTeamId) => {
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) =>
+              rX === pos.x && rY === pos.y && cell
+                ? { ...cell, teamId: toTeamId }
+                : cell,
+            ),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+          const key = `${pos.x.toString()},${pos.y.toString()}`;
+          setFlippingCoords((prev) => new Set(prev).add(key));
+          setTimeout(() => {
+            setFlippingCoords((prev) => {
+              const next = new Set(prev);
+              next.delete(key);
+              return next;
+            });
+          }, 350);
+        },
+        onRaycastBlocked: (wallCoord) => {
+          const rippleId = `${Date.now().toString()}-${Math.random().toString()}`;
+          setShieldRipples((prev) => [
+            ...prev,
+            { id: rippleId, coord: wallCoord },
+          ]);
+          setTimeout(() => {
+            setShieldRipples((prev) => prev.filter((r) => r.id !== rippleId));
+          }, 500);
+        },
+        onCounterTriggered: (center, reversedCoords, defenderTeamId) => {
+          const reversedSet = new Set(
+            reversedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+          );
+          reversedSet.add(`${center.x.toString()},${center.y.toString()}`);
+
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) => {
+              if (
+                reversedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                cell
+              ) {
+                return { ...cell, teamId: defenderTeamId };
+              }
+              return cell;
+            }),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+        },
+        onBombTriggered: (center, blastCoords, teamId) => {
+          const blastSet = new Set(
+            blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+          );
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) => {
+              if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                return { ...cell, teamId };
+              }
+              return cell;
+            }),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+
+          const blastId = `${Date.now().toString()}-${Math.random().toString()}`;
+          setBlastWaves((prev) => [...prev, { id: blastId, center }]);
+          setTimeout(() => {
+            setBlastWaves((prev) => prev.filter((b) => b.id !== blastId));
+          }, 500);
+        },
+        onPurifyPulse: (center, affectedCoords, teamId) => {
+          const affectedSet = new Set(
+            affectedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+          );
+          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+            row.map((cell, rX) => {
+              if (
+                affectedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                cell
+              ) {
+                return { ...cell, teamId };
+              }
+              return cell;
+            }),
+          );
+          setIntermediateBoard(currentIntermediateBoard);
+
+          const auraId = `${Date.now().toString()}-${Math.random().toString()}`;
+          setAuraPulses((prev) => [...prev, { id: auraId, center }]);
+          setTimeout(() => {
+            setAuraPulses((prev) => prev.filter((a) => a.id !== auraId));
+          }, 600);
+        },
+        onAddFloatingText: (text, pos, variant) => {
+          const textId = `${Date.now().toString()}-${Math.random().toString()}`;
+          setFloatingTexts((prev) => [
+            ...prev,
+            { id: textId, text, coord: pos, variant },
+          ]);
+          setTimeout(() => {
+            setFloatingTexts((prev) => prev.filter((t) => t.id !== textId));
+          }, 850);
+        },
+        onTriggerScreenShake: (durationMs = 200) => {
+          setIsScreenShaking(true);
+          setTimeout(() => {
+            setIsScreenShaking(false);
+          }, durationMs);
+        },
+        onTriggerScreenFlash: (color = "purple", durationMs = 250) => {
+          setScreenFlash(color);
+          setTimeout(() => {
+            setScreenFlash(null);
+          }, durationMs);
+        },
+      });
+
+      setGameState(nextState);
+      setEventLogs((prev) => [...events, ...prev]);
+      setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev));
+    } finally {
+      setIsAnimating(false);
+      setIntermediateBoard(null);
+    }
+  };
+
   const handleCellClick = (coord: Coord) => {
+    if (isAnimating) return;
     setErrorMsg(null);
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PLACE_PIECE",
         playerId: gameState.activePlayerId,
         coord,
-        skillType: selectedSkill,
+        skillType: effectiveSkill,
       });
-      setGameState(nextState);
-      setEventLogs((prev) => [...events, ...prev]);
-
-      // Synchronize selectedSkill for incoming active player
-      const incomingPlayer = nextState.players.find(
-        (p) => p.id === nextState.activePlayerId,
-      );
-      if (incomingPlayer) {
-        if (incomingPlayer.isForcedSpecial) {
-          const available = (
-            ["WALL", "PIERCE", "BOMB", "PURIFY", "COUNTER"] as const
-          ).find((sk) => incomingPlayer.hand[sk] > 0);
-          setSelectedSkill(available ?? "NONE");
-        } else if (
-          selectedSkill !== "NONE" &&
-          incomingPlayer.hand[selectedSkill] <= 0
-        ) {
-          setSelectedSkill("NONE");
-        }
-      }
+      void executeEventChoreography(nextState, events);
     } catch (err) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -187,32 +496,14 @@ export default function App() {
   };
 
   const handlePassTurn = () => {
+    if (isAnimating) return;
     setErrorMsg(null);
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PASS_TURN",
         playerId: gameState.activePlayerId,
       });
-      setGameState(nextState);
-      setEventLogs((prev) => [...events, ...prev]);
-
-      // Synchronize selectedSkill for incoming active player
-      const incomingPlayer = nextState.players.find(
-        (p) => p.id === nextState.activePlayerId,
-      );
-      if (incomingPlayer) {
-        if (incomingPlayer.isForcedSpecial) {
-          const available = (
-            ["WALL", "PIERCE", "BOMB", "PURIFY", "COUNTER"] as const
-          ).find((sk) => incomingPlayer.hand[sk] > 0);
-          setSelectedSkill(available ?? "NONE");
-        } else if (
-          selectedSkill !== "NONE" &&
-          incomingPlayer.hand[selectedSkill] <= 0
-        ) {
-          setSelectedSkill("NONE");
-        }
-      }
+      void executeEventChoreography(nextState, events);
     } catch (err) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -221,38 +512,46 @@ export default function App() {
   };
 
   const handleSelectPreset = (preset: MapPreset) => {
+    if (isAnimating) return;
     setSelectedPreset(preset);
     const initial = createInitialGame({ mapPreset: preset, boardSize: 16 });
     setGameState(initial.state);
+    setIntermediateBoard(null);
     setEventLogs(initial.events);
     setErrorMsg(null);
     setSelectedSkill("NONE");
   };
 
   const handleReset = () => {
+    if (isAnimating) return;
     const initial = createInitialGame({
       mapPreset: selectedPreset,
       boardSize: 16,
     });
     setGameState(initial.state);
+    setIntermediateBoard(null);
     setEventLogs(initial.events);
     setErrorMsg(null);
     setSelectedSkill("NONE");
   };
 
   // Team piece count
-  const neutralCount = gameState.board
+  const neutralCount = currentBoard
     .flat()
     .filter((p) => p?.teamId === 0).length;
-  const team1Count = gameState.board
-    .flat()
-    .filter((p) => p?.teamId === 1).length;
-  const team2Count = gameState.board
-    .flat()
-    .filter((p) => p?.teamId === 2).length;
+  const team1Count = currentBoard.flat().filter((p) => p?.teamId === 1).length;
+  const team2Count = currentBoard.flat().filter((p) => p?.teamId === 2).length;
 
   return (
     <div className="min-h-screen bg-slate-900 p-4 font-sans text-slate-100 md:p-8">
+      {/* Screen Flash Overlay for Abyss Counter */}
+      {screenFlash && (
+        <div
+          className="pointer-events-none fixed inset-0 z-50 bg-purple-950/70 backdrop-blur-xs transition-opacity duration-200"
+          aria-hidden="true"
+        />
+      )}
+
       <header className="mx-auto mb-6 flex max-w-7xl flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-white">
@@ -269,9 +568,24 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
+              const nextMuted = toggleAudioMuted();
+              setIsMuted(nextMuted);
+            }}
+            className={`cursor-pointer rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isMuted
+                ? "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                : "border border-sky-500/40 bg-sky-950/40 text-sky-200 hover:bg-sky-900/60"
+            }`}
+          >
+            {isMuted ? "🔇 Muted" : "🔊 Sound On"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setIsGodMode(!isGodMode);
             }}
-            className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+            disabled={isAnimating}
+            className={`cursor-pointer rounded px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               isGodMode
                 ? "bg-purple-700 text-white hover:bg-purple-600"
                 : "bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -282,7 +596,8 @@ export default function App() {
           <button
             type="button"
             onClick={handleReset}
-            className="rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+            disabled={isAnimating}
+            className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Reset Game
           </button>
@@ -302,13 +617,14 @@ export default function App() {
                 <button
                   key={preset}
                   type="button"
+                  disabled={isAnimating}
                   onClick={() => {
                     handleSelectPreset(preset);
                   }}
-                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                     isSelected
                       ? "bg-blue-600 text-white shadow-xs ring-1 ring-blue-400"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      : "cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
                   }`}
                 >
                   <span>{label}</span>
@@ -342,6 +658,24 @@ export default function App() {
           {errorMsg && (
             <div className="mb-3 w-full rounded border border-red-800 bg-red-950/80 px-4 py-2 text-xs text-red-300">
               {errorMsg}
+            </div>
+          )}
+
+          {/* Interaction Lock Indicator */}
+          {isAnimating && (
+            <div className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-purple-500/50 bg-purple-950/60 px-4 py-2 text-xs text-purple-200 shadow-md">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 animate-ping rounded-full bg-purple-400" />
+                <span className="font-bold tracking-wider uppercase">
+                  Resolving Chains...
+                </span>
+                <span className="text-slate-300">
+                  Executing event sequence and combat animations.
+                </span>
+              </div>
+              <span className="rounded bg-purple-900/60 px-2 py-0.5 font-mono text-[11px] text-purple-300">
+                Interaction Locked
+              </span>
             </div>
           )}
 
@@ -402,14 +736,31 @@ export default function App() {
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl">
+          <div
+            className={`relative rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl transition-transform ${
+              isScreenShaking ? "animate-board-shake" : ""
+            }`}
+          >
+            {/* Visual FX Overlays */}
+            <BoardOverlay
+              boardSize={gameState.size}
+              blastWaves={blastWaves}
+              auraPulses={auraPulses}
+              shieldRipples={shieldRipples}
+              pioneerBridges={pioneerBridges}
+            />
+            <FloatingCombatText
+              items={floatingTexts}
+              boardSize={gameState.size}
+            />
+
             <div
               className="grid gap-0.5 rounded bg-slate-800/60 p-0.5"
               style={{
                 gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
               }}
             >
-              {displayedState.board.map((row, y) =>
+              {currentBoard.map((row, y) =>
                 row.map((piece, x) => {
                   const key = `${x.toString()},${y.toString()}`;
                   const isStandardLegal = standardMoveSet.has(key);
@@ -419,6 +770,9 @@ export default function App() {
                     gameState.isDropPhase &&
                     activePlayer?.dropZone &&
                     isWithinDropZone({ x, y }, activePlayer.dropZone);
+                  const isFlipping = flippingCoords.has(key);
+                  const isPopping =
+                    poppingCoord?.x === x && poppingCoord.y === y;
 
                   return (
                     <button
@@ -428,7 +782,9 @@ export default function App() {
                         handleCellClick({ x, y });
                       }}
                       disabled={
-                        gameState.isGameOver || (piece !== null && !isLegal)
+                        isAnimating ||
+                        gameState.isGameOver ||
+                        (piece !== null && !isLegal)
                       }
                       className={`relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
                         (x + y) % 2 === 0
@@ -442,14 +798,32 @@ export default function App() {
                               : "bg-rose-950/30 ring-1 ring-rose-400/50 ring-inset"
                             : "opacity-40"
                           : ""
-                      } hover:bg-slate-700/50`}
+                      } ${
+                        isAnimating
+                          ? "cursor-not-allowed"
+                          : isLegal
+                            ? activePlayer?.teamId === 1
+                              ? "cursor-pointer hover:bg-sky-950/40 hover:ring-1 hover:ring-sky-400/60"
+                              : "cursor-pointer hover:bg-rose-950/40 hover:ring-1 hover:ring-rose-400/60"
+                            : "hover:bg-slate-700/50"
+                      }`}
                     >
-                      {/* Legal Move Marker */}
-                      {piece === null && isStandardLegal && (
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400/50" />
+                      {/* Legal Move Marker matching active team color */}
+                      {piece === null && !isAnimating && isStandardLegal && (
+                        <span
+                          className={getLegalMarkerClass(
+                            activePlayer?.teamId ?? 1,
+                            false,
+                          )}
+                        />
                       )}
-                      {piece === null && isPioneerLegal && (
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400/80 ring-2 ring-amber-400/30" />
+                      {piece === null && !isAnimating && isPioneerLegal && (
+                        <span
+                          className={getLegalMarkerClass(
+                            activePlayer?.teamId ?? 1,
+                            true,
+                          )}
+                        />
                       )}
 
                       {/* Piece Representation */}
@@ -461,6 +835,8 @@ export default function App() {
                             !piece.isRevealed
                               ? "border-dashed ring-1 ring-slate-400/50"
                               : ""
+                          } ${isFlipping ? "animate-piece-flip" : ""} ${
+                            isPopping ? "animate-piece-pop" : ""
                           }`}
                         >
                           {piece.teamId === 0 ? (
@@ -518,7 +894,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={handlePassTurn}
-                className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                disabled={isAnimating || gameState.isGameOver}
+                className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Pass Turn
               </button>
@@ -551,18 +928,20 @@ export default function App() {
             )}
 
             <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2 text-xs text-slate-400">
-              <span>Board Factions:</span>
-              <div className="flex items-center gap-1.5 text-[11px]">
-                <span className="font-bold text-sky-300">
-                  {team1Count.toString()} Sky
+              <span className="font-semibold text-slate-300">
+                盤面棋數統計:
+              </span>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="rounded-md border border-sky-500/40 bg-sky-950/80 px-2 py-0.5 font-bold text-sky-300">
+                  {team1Count.toString()} 藍 (Sky)
                 </span>
                 <span className="text-slate-600">/</span>
-                <span className="font-bold text-rose-300">
-                  {team2Count.toString()} Rose
+                <span className="rounded-md border border-rose-500/40 bg-rose-950/80 px-2 py-0.5 font-bold text-rose-300">
+                  {team2Count.toString()} 紅 (Rose)
                 </span>
                 <span className="text-slate-600">/</span>
-                <span className="font-bold text-amber-400">
-                  {neutralCount.toString()} Neutral
+                <span className="rounded-md border border-amber-500/40 bg-slate-800 px-2 py-0.5 font-bold text-amber-300">
+                  {neutralCount.toString()} 錨點
                 </span>
               </div>
             </div>
@@ -596,25 +975,34 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {player1?.isForcedSpecial && (
-                      <span className="rounded border border-amber-500/50 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                      <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
                         ⚡ FORCED
                       </span>
                     )}
-                    <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-bold text-white">
-                      {team1Count.toString()} pcs
+                    <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
+                      特技: {player1SpecialsCount.toString()} 套
+                    </span>
+                    <span className="rounded-md border border-sky-400/40 bg-sky-950/60 px-2 py-0.5 text-[11px] font-black text-sky-200 shadow-xs">
+                      盤面: {team1Count.toString()} 棋
                     </span>
                   </div>
                 </div>
 
                 {player1?.isForcedSpecial && isActive && (
-                  <div className="flex items-center gap-2 rounded border border-amber-500/60 bg-amber-950/60 px-2.5 py-1.5 text-xs text-amber-200">
-                    <span className="text-sm">⚡</span>
-                    <span className="text-[11px] font-semibold">
-                      Forced Special: Hand capacity overflowed! Must place a
-                      special skill.
-                    </span>
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/70 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 shadow-md">
+                    <span className="text-base">⚡</span>
+                    <div className="flex flex-col">
+                      <span className="font-bold tracking-wide text-amber-300">
+                        強制技能階段 (Forced Special)
+                      </span>
+                      <span className="text-[11px] text-amber-200/90">
+                        技能庫存溢出！已自動選取最強力的特殊棋種（
+                        {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
+                        ），本回合必須放置特殊棋。
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -635,8 +1023,9 @@ export default function App() {
                     const isOutOfStock = !isNone && count <= 0;
                     const isForbidden =
                       isNone && (player1?.isForcedSpecial ?? false);
-                    const isDisabled = !isActive || isOutOfStock || isForbidden;
-                    const isSelected = isActive && selectedSkill === opt.type;
+                    const isDisabled =
+                      isAnimating || !isActive || isOutOfStock || isForbidden;
+                    const isSelected = isActive && effectiveSkill === opt.type;
                     const config = SKILL_CONFIG[opt.type];
 
                     return (
@@ -677,33 +1066,39 @@ export default function App() {
                                 </span>
                               ) : null}
                             </span>
-                            <span className="truncate text-[11px] font-semibold">
+                            <span className="truncate text-[11px] font-bold">
                               {opt.label.split(" ")[0]}
                             </span>
                           </div>
+
+                          {/* Prominent Stock Badge */}
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-black tracking-tight ${
                               isNone
-                                ? "bg-slate-800 text-slate-400"
+                                ? "border border-slate-700 bg-slate-800 text-slate-300"
                                 : count >= maxHand
-                                  ? "border border-amber-500/50 bg-amber-500/20 text-amber-300"
+                                  ? "border border-amber-400/80 bg-amber-500/30 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
                                   : count > 0
-                                    ? "border border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
-                                    : "border border-slate-800 bg-slate-800 text-slate-500"
+                                    ? "border border-emerald-400/80 bg-emerald-500/30 text-emerald-100 shadow-xs ring-1 ring-emerald-400/40"
+                                    : "border border-rose-900/60 bg-rose-950/60 text-rose-400/90"
                             }`}
                           >
                             {isNone
-                              ? "∞"
-                              : `${count.toString()}/${maxHand.toString()}`}
+                              ? "∞ 無限"
+                              : count >= maxHand
+                                ? `庫存 ${count.toString()}/${maxHand.toString()} (滿)`
+                                : count > 0
+                                  ? `庫存 ${count.toString()}/${maxHand.toString()}`
+                                  : `0/${maxHand.toString()} (無庫存)`}
                           </span>
                         </div>
 
                         {!isNone && (
                           <div className="w-full">
-                            <div className="mb-0.5 flex items-center justify-between text-[10px] text-slate-400">
-                              <span>CD Charge</span>
-                              <span className="font-mono text-[9px]">
-                                {charge.toString()}/{cd.toString()}
+                            <div className="mb-0.5 flex items-center justify-between text-[10px]">
+                              <span className="text-slate-400">冷卻進度</span>
+                              <span className="font-mono font-bold text-slate-200">
+                                {charge.toString()}/{cd.toString()} 回合
                               </span>
                             </div>
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
@@ -724,18 +1119,23 @@ export default function App() {
                         )}
 
                         {isForbidden && (
-                          <span className="text-[9px] font-semibold text-red-400">
-                            🚫 Blocked
+                          <span className="text-[10px] font-bold text-red-400">
+                            🚫 禁下常規棋
                           </span>
                         )}
                         {!isNone &&
                           isOutOfStock &&
                           !isForbidden &&
                           isActive && (
-                            <span className="text-[9px] text-slate-500">
-                              Stock: 0
+                            <span className="text-[10px] font-semibold text-rose-400">
+                              ❌ 庫存為 0 (需充能)
                             </span>
                           )}
+                        {!isNone && count > 0 && !isForbidden && isActive && (
+                          <span className="text-[10px] font-semibold text-emerald-400">
+                            ✔ 可部署
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -772,25 +1172,34 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {player2?.isForcedSpecial && (
-                      <span className="rounded border border-amber-500/50 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                      <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
                         ⚡ FORCED
                       </span>
                     )}
-                    <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-bold text-white">
-                      {team2Count.toString()} pcs
+                    <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
+                      特技: {player2SpecialsCount.toString()} 套
+                    </span>
+                    <span className="rounded-md border border-rose-400/40 bg-rose-950/60 px-2 py-0.5 text-[11px] font-black text-rose-200 shadow-xs">
+                      盤面: {team2Count.toString()} 棋
                     </span>
                   </div>
                 </div>
 
                 {player2?.isForcedSpecial && isActive && (
-                  <div className="flex items-center gap-2 rounded border border-amber-500/60 bg-amber-950/60 px-2.5 py-1.5 text-xs text-amber-200">
-                    <span className="text-sm">⚡</span>
-                    <span className="text-[11px] font-semibold">
-                      Forced Special: Hand capacity overflowed! Must place a
-                      special skill.
-                    </span>
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/70 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 shadow-md">
+                    <span className="text-base">⚡</span>
+                    <div className="flex flex-col">
+                      <span className="font-bold tracking-wide text-amber-300">
+                        強制技能階段 (Forced Special)
+                      </span>
+                      <span className="text-[11px] text-amber-200/90">
+                        技能庫存溢出！已自動選取最強力的特殊棋種（
+                        {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
+                        ），本回合必須放置特殊棋。
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -811,8 +1220,9 @@ export default function App() {
                     const isOutOfStock = !isNone && count <= 0;
                     const isForbidden =
                       isNone && (player2?.isForcedSpecial ?? false);
-                    const isDisabled = !isActive || isOutOfStock || isForbidden;
-                    const isSelected = isActive && selectedSkill === opt.type;
+                    const isDisabled =
+                      isAnimating || !isActive || isOutOfStock || isForbidden;
+                    const isSelected = isActive && effectiveSkill === opt.type;
                     const config = SKILL_CONFIG[opt.type];
 
                     return (
@@ -853,33 +1263,39 @@ export default function App() {
                                 </span>
                               ) : null}
                             </span>
-                            <span className="truncate text-[11px] font-semibold">
+                            <span className="truncate text-[11px] font-bold">
                               {opt.label.split(" ")[0]}
                             </span>
                           </div>
+
+                          {/* Prominent Stock Badge */}
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-black tracking-tight ${
                               isNone
-                                ? "bg-slate-800 text-slate-400"
+                                ? "border border-slate-700 bg-slate-800 text-slate-300"
                                 : count >= maxHand
-                                  ? "border border-amber-500/50 bg-amber-500/20 text-amber-300"
+                                  ? "border border-amber-400/80 bg-amber-500/30 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
                                   : count > 0
-                                    ? "border border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
-                                    : "border border-slate-800 bg-slate-800 text-slate-500"
+                                    ? "border border-emerald-400/80 bg-emerald-500/30 text-emerald-100 shadow-xs ring-1 ring-emerald-400/40"
+                                    : "border border-rose-900/60 bg-rose-950/60 text-rose-400/90"
                             }`}
                           >
                             {isNone
-                              ? "∞"
-                              : `${count.toString()}/${maxHand.toString()}`}
+                              ? "∞ 無限"
+                              : count >= maxHand
+                                ? `庫存 ${count.toString()}/${maxHand.toString()} (滿)`
+                                : count > 0
+                                  ? `庫存 ${count.toString()}/${maxHand.toString()}`
+                                  : `0/${maxHand.toString()} (無庫存)`}
                           </span>
                         </div>
 
                         {!isNone && (
                           <div className="w-full">
-                            <div className="mb-0.5 flex items-center justify-between text-[10px] text-slate-400">
-                              <span>CD Charge</span>
-                              <span className="font-mono text-[9px]">
-                                {charge.toString()}/{cd.toString()}
+                            <div className="mb-0.5 flex items-center justify-between text-[10px]">
+                              <span className="text-slate-400">冷卻進度</span>
+                              <span className="font-mono font-bold text-slate-200">
+                                {charge.toString()}/{cd.toString()} 回合
                               </span>
                             </div>
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
@@ -900,18 +1316,23 @@ export default function App() {
                         )}
 
                         {isForbidden && (
-                          <span className="text-[9px] font-semibold text-red-400">
-                            🚫 Blocked
+                          <span className="text-[10px] font-bold text-red-400">
+                            🚫 禁下常規棋
                           </span>
                         )}
                         {!isNone &&
                           isOutOfStock &&
                           !isForbidden &&
                           isActive && (
-                            <span className="text-[9px] text-slate-500">
-                              Stock: 0
+                            <span className="text-[10px] font-semibold text-rose-400">
+                              ❌ 庫存為 0 (需充能)
                             </span>
                           )}
+                        {!isNone && count > 0 && !isForbidden && isActive && (
+                          <span className="text-[10px] font-semibold text-emerald-400">
+                            ✔ 可部署
+                          </span>
+                        )}
                       </button>
                     );
                   })}

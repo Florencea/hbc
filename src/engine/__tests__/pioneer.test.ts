@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { IllegalMoveError } from "../map.ts";
 import { dispatch } from "../pipeline.ts";
-import { getAvailableMoves, getLegalMoves, getPioneerMoves } from "../raycast.ts";
+import {
+  getAvailableMoves,
+  getLegalMoves,
+  getPioneerMoves,
+} from "../raycast.ts";
 import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
 
 describe("pioneer placement (開拓落子 / bridge step)", () => {
@@ -102,7 +106,9 @@ describe("pioneer placement (開拓落子 / bridge step)", () => {
         coord: { x: 5, y: 4 },
         skillType: "NONE",
       });
-    }).toThrow(new IllegalMoveError("Illegal move: must capture at least one piece"));
+    }).toThrow(
+      new IllegalMoveError("Illegal move: must capture at least one piece"),
+    );
   });
 
   it("pioneer_bridging_enables_subsequent_captures", () => {
