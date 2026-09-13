@@ -6,14 +6,15 @@ import {
   getLegalMoves,
 } from "./raycast.ts";
 import { sanitizeForViewer } from "./sanitize.ts";
-import type {
-  Action,
-  AIDifficulty,
-  AIMoveDecision,
-  Board,
-  Coord,
-  GameState,
-  SkillType,
+import {
+  SKILL_SPECS,
+  type Action,
+  type AIDifficulty,
+  type AIMoveDecision,
+  type Board,
+  type Coord,
+  type GameState,
+  type SkillType,
 } from "./types.ts";
 
 const ALL_SPECIAL_SKILLS: readonly Exclude<SkillType, "NONE">[] = [
@@ -175,15 +176,13 @@ export function selectBestMove(
       candidateSkills = ["WALL"];
     }
   } else {
-    // Default to NONE when hand should be preserved
+    // Default to NONE, plus any available skills currently in hand
     candidateSkills = ["NONE"];
-    if (difficulty !== "EASY") {
-      if (player.hand.WALL > 0) candidateSkills.push("WALL");
-      if (player.hand.PIERCE > 0) candidateSkills.push("PIERCE");
-      if (player.hand.BOMB > 0) candidateSkills.push("BOMB");
-      if (player.hand.PURIFY > 0) candidateSkills.push("PURIFY");
-      if (player.hand.COUNTER > 0) candidateSkills.push("COUNTER");
-    }
+    if (player.hand.WALL > 0) candidateSkills.push("WALL");
+    if (player.hand.PIERCE > 0) candidateSkills.push("PIERCE");
+    if (player.hand.BOMB > 0) candidateSkills.push("BOMB");
+    if (player.hand.PURIFY > 0) candidateSkills.push("PURIFY");
+    if (player.hand.COUNTER > 0) candidateSkills.push("COUNTER");
   }
 
   // 2. Evaluate all legal standard moves
@@ -222,70 +221,131 @@ export function selectBestMove(
       }
 
       // Skill-specific preference heuristics
-      if (skill === "WALL") {
-        if (posWeight >= 100) {
-          // Impregnable corner wall
-          score += 45;
-        } else if (isEdgeCoord(sanitized.size, coord)) {
-          score += 25;
-        }
-        if (isChokePoint(sanitized.board, sanitized.size, coord)) {
-          score += 25;
-        }
-      } else if (skill === "PIERCE") {
-        const penetratesWall = raycasts.some(
-          (r) => r.penetratedWallCoords.length > 0,
-        );
-        if (penetratesWall) {
-          score += 45;
-        } else if (captureCount >= 5) {
-          score += 25;
-        } else if (player.isForcedSpecial) {
-          score += 15;
-        }
-      } else if (skill === "BOMB") {
-        const clusterCount = countEnemyOrNeutralIn3x3(
-          sanitized.board,
-          sanitized.size,
-          coord,
-          player.teamId,
-        );
-        // BOMB is a dangerous double-edged trap; only prioritize when deeply surrounded
-        if (clusterCount >= 6) {
-          score += 20;
-        } else if (clusterCount >= 5 && player.isForcedSpecial) {
-          score += 18;
-        } else if (player.isForcedSpecial) {
-          score += 10;
-        }
-      } else if (skill === "COUNTER") {
-        if (posWeight < 0) {
-          // Bait trap on C-squares / X-squares to punish opponent capture
-          score += 40;
-        } else if (captureCount >= 3) {
-          score += 25;
-        } else if (player.isForcedSpecial) {
-          score += 15;
-        }
-      } else if (skill === "PURIFY") {
-        const clusterCount = countEnemyOrNeutralIn3x3(
-          sanitized.board,
-          sanitized.size,
-          coord,
-          player.teamId,
-        );
-        if (clusterCount >= 4) {
-          score += 30;
-        } else if (clusterCount >= 2 && player.isForcedSpecial) {
-          score += 20;
-        } else if (player.isForcedSpecial) {
-          score += 15;
-        }
-      }
+      if (skill !== "NONE") {
+        const spec = SKILL_SPECS[skill];
+        const handCount = player.hand[skill];
+        const isSaturated = handCount >= spec.maxHand;
+        const isAboutToCharge = player.charge[skill] >= spec.cd - 1;
 
-      // Hand preservation penalty if not forced special
-      if (!player.isForcedSpecial && skill !== "NONE") {
-        score -= 35;
+        // Stock burn incentive: when saturated, cooldown generation is completely paused.
+        // Deploying the skill frees up the pipeline for continuous charge generation.
+        if (isSaturated) {
+          score += 15;
+        } else if (isAboutToCharge) {
+          score += 8;
+        }
+
+        // Baseline superpower bonus: special pieces provide tactical advantages over vanilla pieces.
+        score += 12;
+
+        if (skill === "WALL") {
+          if (posWeight >= 100) {
+            // Impregnable corner wall: permanent anchor that cannot be flipped
+            score += 50;
+          } else if (isEdgeCoord(sanitized.size, coord)) {
+            // Cuts off entire flank raycast lines
+            score += 35;
+          }
+          if (isChokePoint(sanitized.board, sanitized.size, coord)) {
+            score += 30;
+          }
+          if (captureCount >= 2) {
+            // Protects the captured line from immediate reverse capture
+            score += 15;
+          }
+        } else if (skill === "PIERCE") {
+          const penetratesWall = raycasts.some(
+            (r) => r.penetratedWallCoords.length > 0,
+          );
+          if (penetratesWall) {
+            // Shatters enemy defensive wall!
+            score += 65;
+          }
+          if (captureCount >= 4) {
+            score += 35;
+          } else if (captureCount >= 2) {
+            score += 20;
+          } else if (captureCount >= 1) {
+            score += 10;
+          }
+          const enemyInCluster = countEnemyOrNeutralIn3x3(
+            sanitized.board,
+            sanitized.size,
+            coord,
+            player.teamId,
+          );
+          if (enemyInCluster >= 2) {
+            score += 15;
+          }
+          if (player.isForcedSpecial) {
+            score += 15;
+          }
+        } else if (skill === "BOMB") {
+          const clusterCount = countEnemyOrNeutralIn3x3(
+            sanitized.board,
+            sanitized.size,
+            coord,
+            player.teamId,
+          );
+          // 3x3 blast upon opponent recapture: converts surrounding enemy pieces
+          if (clusterCount >= 4) {
+            score += 45;
+          } else if (clusterCount >= 2) {
+            score += 30;
+          } else if (clusterCount >= 1) {
+            score += 20;
+          }
+
+          // Bait square trap: enemies love capturing C/X squares or edges
+          if (posWeight < 0) {
+            score += 45;
+          } else if (isEdgeCoord(sanitized.size, coord)) {
+            score += 25;
+          }
+
+          if (player.isForcedSpecial) {
+            score += 15;
+          }
+        } else if (skill === "COUNTER") {
+          // Reversal backlash trap: hijacks entire enemy capture line
+          if (posWeight < 0) {
+            score += 55;
+          } else if (isEdgeCoord(sanitized.size, coord)) {
+            score += 35;
+          }
+          if (captureCount >= 2) {
+            score += 20;
+          }
+          if (player.isForcedSpecial) {
+            score += 15;
+          }
+        } else {
+          // PURIFY
+          const clusterCount = countEnemyOrNeutralIn3x3(
+            sanitized.board,
+            sanitized.size,
+            coord,
+            player.teamId,
+          );
+          // Immediate 3x3 aura pulse: converts enemy pieces and silently neutralizes traps
+          if (clusterCount >= 4) {
+            score += 50;
+          } else if (clusterCount >= 2) {
+            score += 35;
+          } else if (clusterCount >= 1) {
+            score += 25;
+          }
+
+          if (player.isForcedSpecial) {
+            score += 15;
+          }
+        }
+
+        // Soft hand preservation threshold: prevents wasteful skill deployment on empty, non-tactical squares
+        // when hand stock is low (1) and cooldown is not yet ready to refill.
+        if (!player.isForcedSpecial && !isSaturated && handCount <= 1) {
+          score -= 14;
+        }
       }
 
       // HARD: evaluate opponent mobility lookahead
@@ -367,7 +427,7 @@ export function selectBestMove(
       }
     }
 
-    const pioneerCandidates: { coord: Coord; score: number }[] = [];
+    const pioneerDecisions: { action: Action; score: number }[] = [];
 
     for (const pCoord of available.pioneerMoves) {
       if (
@@ -398,33 +458,80 @@ export function selectBestMove(
         sanitized.board,
         sanitized.size,
       );
-      const compositeScore = -d * 10 + posWeight * 0.1;
-      pioneerCandidates.push({ coord: pCoord, score: compositeScore });
+      const baseScore = -d * 50 + posWeight * 0.1;
+
+      for (const skill of candidateSkills) {
+        let skillScore = baseScore;
+
+        if (skill !== "NONE") {
+          const spec = SKILL_SPECS[skill];
+          const handCount = player.hand[skill];
+          const isSaturated = handCount >= spec.maxHand;
+          const clusterCount = countEnemyOrNeutralIn3x3(
+            sanitized.board,
+            sanitized.size,
+            pCoord,
+            player.teamId,
+          );
+
+          if (isSaturated) {
+            skillScore += 15;
+          }
+
+          if (skill === "WALL") {
+            if (isEdgeCoord(sanitized.size, pCoord)) skillScore += 30;
+            if (isChokePoint(sanitized.board, sanitized.size, pCoord)) {
+              skillScore += 25;
+            }
+            skillScore += 10;
+          } else if (skill === "BOMB") {
+            if (clusterCount >= 1) skillScore += 35;
+            if (d <= 3) skillScore += 20;
+            skillScore += 10;
+          } else if (skill === "PURIFY") {
+            if (clusterCount >= 1) skillScore += 40;
+            skillScore += 10;
+          } else if (skill === "COUNTER") {
+            if (d <= 3) skillScore += 30;
+            if (isEdgeCoord(sanitized.size, pCoord)) skillScore += 20;
+            skillScore += 10;
+          } else {
+            // PIERCE
+            skillScore += 10;
+          }
+
+          if (!player.isForcedSpecial && !isSaturated && handCount <= 1) {
+            skillScore -= 12;
+          }
+        }
+
+        pioneerDecisions.push({
+          action: {
+            type: "PLACE_PIECE",
+            playerId,
+            coord: pCoord,
+            skillType: skill,
+          },
+          score: skillScore,
+        });
+      }
     }
 
-    // Sort pioneer candidates by score descending
-    pioneerCandidates.sort((a, b) => {
+    // Sort pioneer decisions by score descending
+    pioneerDecisions.sort((a, b) => {
       if (Math.abs(b.score - a.score) > 1e-6) {
         return b.score - a.score;
       }
-      if (a.coord.y !== b.coord.y) return a.coord.y - b.coord.y;
-      return a.coord.x - b.coord.x;
+      const aCoord = (a.action as { coord: Coord }).coord;
+      const bCoord = (b.action as { coord: Coord }).coord;
+      if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
+      return aCoord.x - bCoord.x;
     });
 
-    const chosenSkill: SkillType = player.isForcedSpecial
-      ? (candidateSkills[0] ?? "WALL")
-      : "NONE";
-
-    for (const candidate of pioneerCandidates) {
-      const pioneerAction: Action = {
-        type: "PLACE_PIECE",
-        playerId,
-        coord: candidate.coord,
-        skillType: chosenSkill,
-      };
+    for (const decision of pioneerDecisions) {
       try {
-        dispatch(state, pioneerAction);
-        return pioneerAction;
+        dispatch(state, decision.action);
+        return decision.action;
       } catch {
         continue;
       }

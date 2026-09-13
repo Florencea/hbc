@@ -204,6 +204,128 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       }
     });
 
+    it("ai_voluntarily_selects_pierce_to_penetrate_wall: chooses PIERCE over NONE when enemy wall is present", () => {
+      const board = createEmptyBoard(16);
+      // Attacker Team 1 at (2, 2)
+      // (3, 2) is Team 2 WALL; (4, 2) is Team 1 NONE
+      board[2][3] = makePiece(2, 2, "WALL", true);
+      board[2][4] = makePiece(1, 1, "NONE");
+
+      const state = makeTestState(board, 1);
+      const player = state.players.find((p) => p.id === 1);
+      expect(player).toBeDefined();
+      if (!player) return;
+      player.isForcedSpecial = false;
+      player.hand = {
+        NONE: Infinity,
+        WALL: 0,
+        PIERCE: 1,
+        BOMB: 0,
+        PURIFY: 0,
+        COUNTER: 0,
+      };
+
+      const action = selectBestMove(state, 1, "MEDIUM");
+      expect(action.type).toBe("PLACE_PIECE");
+      if (action.type === "PLACE_PIECE") {
+        expect(action.coord).toEqual({ x: 2, y: 2 });
+        expect(action.skillType).toBe("PIERCE");
+      }
+    });
+
+    it("ai_voluntarily_selects_purify_against_dense_clusters: chooses PURIFY over NONE when adjacent to multiple enemies", () => {
+      const board = createEmptyBoard(16);
+      // Placed piece at (5, 5) PURIFY (Team 1)
+      // Flanks (5, 6) [Team 2] against (5, 7) [Team 1]
+      board[5][6] = makePiece(2, 2, "NONE");
+      board[5][7] = makePiece(1, 1, "NONE");
+
+      // Surrounding cluster in 3x3 of (5, 5):
+      board[4][4] = makePiece(2, 2, "NONE");
+      board[4][5] = makePiece(2, 2, "NONE");
+      board[5][4] = makePiece(2, 2, "NONE");
+
+      const state = makeTestState(board, 1);
+      const player = state.players.find((p) => p.id === 1);
+      expect(player).toBeDefined();
+      if (!player) return;
+      player.isForcedSpecial = false;
+      player.hand = {
+        NONE: Infinity,
+        WALL: 0,
+        PIERCE: 0,
+        BOMB: 0,
+        PURIFY: 1,
+        COUNTER: 0,
+      };
+
+      const action = selectBestMove(state, 1, "MEDIUM");
+      expect(action.type).toBe("PLACE_PIECE");
+      if (action.type === "PLACE_PIECE") {
+        expect(action.coord).toEqual({ x: 5, y: 5 });
+        expect(action.skillType).toBe("PURIFY");
+      }
+    });
+
+    it("ai_voluntarily_selects_counter_on_bait_square: chooses COUNTER on C-square to punish opponent recapture", () => {
+      const board = createEmptyBoard(16);
+      // Placed piece at (1, 0) [C-square next to empty corner (0, 0)]
+      // Flanks (2, 0) [Team 2] against (3, 0) [Team 1]
+      board[0][2] = makePiece(2, 2, "NONE");
+      board[0][3] = makePiece(1, 1, "NONE");
+
+      const state = makeTestState(board, 1);
+      const player = state.players.find((p) => p.id === 1);
+      expect(player).toBeDefined();
+      if (!player) return;
+      player.isForcedSpecial = false;
+      player.hand = {
+        NONE: Infinity,
+        WALL: 0,
+        PIERCE: 0,
+        BOMB: 0,
+        PURIFY: 0,
+        COUNTER: 1,
+      };
+
+      const action = selectBestMove(state, 1, "MEDIUM");
+      expect(action.type).toBe("PLACE_PIECE");
+      if (action.type === "PLACE_PIECE") {
+        expect(action.coord).toEqual({ x: 1, y: 0 });
+        expect(action.skillType).toBe("COUNTER");
+      }
+    });
+
+    it("ai_vs_ai_actively_deploys_special_skills: voluntary special moves occur frequently throughout match", () => {
+      const { state: initState } = createInitialGame({
+        mapPreset: "CROSSROADS",
+        boardSize: 16,
+      });
+      let state = initState;
+      let voluntarySpecialCount = 0;
+      let totalMoves = 0;
+
+      for (let turn = 0; turn < 40 && !state.isGameOver; turn++) {
+        const activePlayer = state.players.find(
+          (p) => p.id === state.activePlayerId,
+        );
+        const wasForced = activePlayer?.isForcedSpecial ?? false;
+        const action = selectBestMove(state, state.activePlayerId, "MEDIUM");
+        if (action.type === "PLACE_PIECE") {
+          totalMoves++;
+          if (action.skillType && action.skillType !== "NONE" && !wasForced) {
+            voluntarySpecialCount++;
+          }
+        }
+        const res = dispatch(state, action);
+        state = res.nextState;
+      }
+
+      // Verify that the AI actively and voluntarily plays special skills during the match
+      expect(totalMoves).toBeGreaterThan(20);
+      expect(voluntarySpecialCount).toBeGreaterThan(5);
+    });
+
     it("ai_vs_ai_game_simulation: complete multi-turn match without any illegal move errors", () => {
       const presets: MapPreset[] = ["CROSSROADS", "ARCHIPELAGO", "TRENCHES"];
       for (const preset of presets) {
