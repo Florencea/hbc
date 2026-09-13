@@ -54,17 +54,21 @@ export type GameEvent =
   | {
       type: "PIECE_PLACED";
       coord: Coord;
+      pos?: Coord;
       piece: Piece;
     }
   | {
       type: "RAYCAST_BLOCKED";
       coord: Coord;
+      pos?: Coord;
+      wallPos?: Coord;
       blockerPiece: Piece;
       direction: Coord;
     }
   | {
       type: "PIECE_REVEALED";
       coord: Coord;
+      pos?: Coord;
       skillType: SkillType;
       reason: "BLOCK" | "PENETRATE" | "AURA" | "TRIGGER";
     }
@@ -77,20 +81,29 @@ export type GameEvent =
   | {
       type: "COUNTER_TRIGGERED";
       coord: Coord;
+      source?: Coord;
       defenderTeamId: number;
+      factionId?: number;
       reversedCoords: Coord[];
+      hijackedBatch?: Coord[];
     }
   | {
       type: "BOMB_TRIGGERED";
       coord: Coord;
+      center?: Coord;
       teamId: number;
+      factionId?: number;
       blastCoords: Coord[];
+      affected?: Coord[];
     }
   | {
       type: "PURIFY_PULSE";
       coord: Coord;
+      center?: Coord;
       teamId: number;
+      factionId?: number;
       affectedCoords: Coord[];
+      affected?: Coord[];
       remainingDuration: number;
     }
   | {
@@ -103,6 +116,11 @@ export type GameEvent =
       type: "GAME_OVER";
       winnerTeamId: number | null;
     };
+
+export interface ResolutionResult {
+  nextState: GameState;
+  events: GameEvent[];
+}
 
 export type Action =
   | {

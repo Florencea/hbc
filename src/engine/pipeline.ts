@@ -6,6 +6,7 @@ import type {
   GameEvent,
   GameState,
   Piece,
+  ResolutionResult,
   SkillType,
 } from "./types.ts";
 
@@ -171,6 +172,7 @@ export function dispatch(
           events.push({
             type: "PIECE_REVEALED",
             coord: ray.blockedCoord,
+            pos: ray.blockedCoord,
             skillType: "WALL",
             reason: "BLOCK",
           });
@@ -178,6 +180,8 @@ export function dispatch(
         events.push({
           type: "RAYCAST_BLOCKED",
           coord: ray.blockedCoord,
+          pos: action.coord,
+          wallPos: ray.blockedCoord,
           blockerPiece: { ...wallPiece },
           direction: ray.direction,
         });
@@ -189,6 +193,7 @@ export function dispatch(
       events.push({
         type: "PIECE_REVEALED",
         coord: action.coord,
+        pos: action.coord,
         skillType: "PIERCE",
         reason: "PENETRATE",
       });
@@ -208,7 +213,7 @@ export function dispatch(
     throw new Error("Illegal move: must capture at least one piece");
   }
 
-  // 3. Check for COUNTER trap in captured pieces
+  // 3. Phase 2: Black Counter Check
   const counterCoord = capturedCoords.find((c) => {
     const piece = state.board[c.y]?.[c.x];
     return piece?.skillType === "COUNTER" && piece.teamId !== attacker.teamId;
@@ -228,24 +233,75 @@ export function dispatch(
       counterPiece.skillType = "NONE";
       counterPiece.isRevealed = true;
 
+      // Backlash reverses the batch. If the backlash path encounters a WALL, it stops at the wall.
+      let wallBlockedBacklash = false;
+      for (const ray of raycasts) {
+        if (
+          ray.capturedCoords.some(
+            (c) => c.x === counterCoord.x && c.y === counterCoord.y,
+          )
+        ) {
+          const dx = ray.direction.x;
+          const dy = ray.direction.y;
+          let cx = counterCoord.x - dx;
+          let cy = counterCoord.y - dy;
+          while (cx !== action.coord.x || cy !== action.coord.y) {
+            const p = newBoard[cy]?.[cx];
+            if (p?.skillType === "WALL") {
+              wallBlockedBacklash = true;
+              break;
+            }
+            cx -= dx;
+            cy -= dy;
+          }
+        }
+      }
+
       // Entire active flip batch + placed piece converted to defender faction
-      const reversedCoords: Coord[] = [action.coord, ...capturedCoords];
-      for (const c of reversedCoords) {
+      const rawReversed: Coord[] = [action.coord, ...capturedCoords];
+      const reversedCoords: Coord[] = [];
+      for (const c of rawReversed) {
+        if (
+          wallBlockedBacklash &&
+          c.x === action.coord.x &&
+          c.y === action.coord.y
+        ) {
+          continue;
+        }
         const p = newBoard[c.y]?.[c.x];
         if (p) {
           p.teamId = defenderTeamId;
           p.playerId = defenderPlayerId;
+          reversedCoords.push(c);
         }
       }
 
       events.push({
         type: "COUNTER_TRIGGERED",
         coord: counterCoord,
+        source: counterCoord,
         defenderTeamId,
+        factionId: defenderTeamId,
         reversedCoords,
+        hijackedBatch: reversedCoords,
       });
 
-      // Chains into adjacent unexploded BOMBs
+      // If backlash engulfs a BOMB in reversedCoords, enqueue it
+      for (const c of reversedCoords) {
+        const orig =
+          state.board[c.y]?.[c.x] ??
+          (c.x === action.coord.x && c.y === action.coord.y ? newPiece : null);
+        const key = `${c.x.toString()},${c.y.toString()}`;
+        if (orig?.skillType === "BOMB" && !processedBombs.has(key)) {
+          bombQueue.push({
+            coord: c,
+            teamId: defenderTeamId,
+          });
+          processedBombs.add(key);
+        }
+      }
+
+      // Also chains into adjacent unexploded BOMBs
       for (const c of reversedCoords) {
         for (const dir of DIRECTIONS) {
           const nx = c.x + dir.x;
@@ -256,7 +312,7 @@ export function dispatch(
             if (adjPiece?.skillType === "BOMB" && !processedBombs.has(key)) {
               bombQueue.push({
                 coord: { x: nx, y: ny },
-                teamId: adjPiece.teamId,
+                teamId: defenderTeamId,
               });
               processedBombs.add(key);
             }
@@ -271,6 +327,7 @@ export function dispatch(
       events.push({
         type: "PIECE_REVEALED",
         coord: action.coord,
+        pos: action.coord,
         skillType: "PIERCE",
         reason: "TRIGGER",
       });
@@ -290,11 +347,11 @@ export function dispatch(
         currentPiece.teamId = attacker.teamId;
         currentPiece.playerId = attacker.id;
 
-        // If flipped piece was a BOMB, trigger explosion
+        // If flipped piece was a BOMB, trigger explosion with triggering faction = attacker.teamId
         if (originalPiece.skillType === "BOMB") {
           const key = `${c.x.toString()},${c.y.toString()}`;
           if (!processedBombs.has(key)) {
-            bombQueue.push({ coord: c, teamId: originalPiece.teamId });
+            bombQueue.push({ coord: c, teamId: attacker.teamId });
             processedBombs.add(key);
           }
         }
@@ -309,7 +366,7 @@ export function dispatch(
     });
   }
 
-  // 4. Process Bomb Chain Reactions via BFS queue
+  // 4. Phase 3: Process Bomb Chain Reactions via BFS queue
   while (bombQueue.length > 0) {
     const bombItem: BombQueueItem | undefined = bombQueue.shift();
     if (!bombItem) break;
@@ -318,6 +375,7 @@ export function dispatch(
 
     bombPiece.skillType = "NONE";
     bombPiece.isRevealed = true;
+    bombPiece.teamId = bombItem.teamId;
 
     const blastCoords: Coord[] = [];
 
@@ -331,24 +389,32 @@ export function dispatch(
         if (!targetPiece) continue;
 
         // PIERCE piece is immune to Bomb explosion
-        if (targetPiece.skillType === "PIERCE") continue;
+        if (targetPiece.skillType === "PIERCE") {
+          if (!targetPiece.isRevealed) {
+            targetPiece.isRevealed = true;
+            events.push({
+              type: "PIECE_REVEALED",
+              coord: { x: nx, y: ny },
+              pos: { x: nx, y: ny },
+              skillType: "PIERCE",
+              reason: "TRIGGER",
+            });
+          }
+          continue;
+        }
 
         blastCoords.push({ x: nx, y: ny });
 
         const prevSkill = targetPiece.skillType;
-        const prevTeam = targetPiece.teamId;
 
-        // Convert to Bomb's faction
-        targetPiece.teamId = bombItem.teamId;
-
-        // Check if bomb blast triggers another BOMB
+        // Check if bomb blast triggers another BOMB (chain reaction)
         const key = `${nx.toString()},${ny.toString()}`;
         if (prevSkill === "BOMB" && !processedBombs.has(key)) {
           processedBombs.add(key);
-          bombQueue.push({ coord: { x: nx, y: ny }, teamId: prevTeam });
+          bombQueue.push({ coord: { x: nx, y: ny }, teamId: bombItem.teamId });
         }
 
-        // Check if bomb blast hits a COUNTER: chains into adjacent BOMBs
+        // Check if bomb blast hits an unrevealed COUNTER (crossfire backlash)
         if (prevSkill === "COUNTER") {
           targetPiece.skillType = "NONE";
           targetPiece.isRevealed = true;
@@ -362,11 +428,18 @@ export function dispatch(
                 processedBombs.add(bKey);
                 bombQueue.push({
                   coord: { x: cnx, y: cny },
-                  teamId: adjBomb.teamId,
+                  teamId: bombItem.teamId,
                 });
               }
             }
           }
+        }
+
+        // Convert to Bomb's triggering faction and normal piece
+        targetPiece.teamId = bombItem.teamId;
+        if (targetPiece.skillType !== "BOMB") {
+          targetPiece.skillType = "NONE";
+          targetPiece.isRevealed = true;
         }
       }
     }
@@ -374,8 +447,11 @@ export function dispatch(
     events.push({
       type: "BOMB_TRIGGERED",
       coord: bombItem.coord,
+      center: bombItem.coord,
       teamId: bombItem.teamId,
+      factionId: bombItem.teamId,
       blastCoords,
+      affected: blastCoords,
     });
   }
 
@@ -438,7 +514,19 @@ function applyPurifyPulses(
             if (!target) continue;
 
             // PIERCE piece is immune to Purify
-            if (target.skillType === "PIERCE") continue;
+            if (target.skillType === "PIERCE") {
+              if (!target.isRevealed) {
+                target.isRevealed = true;
+                events.push({
+                  type: "PIECE_REVEALED",
+                  coord: { x: nx, y: ny },
+                  pos: { x: nx, y: ny },
+                  skillType: "PIERCE",
+                  reason: "AURA",
+                });
+              }
+              continue;
+            }
 
             if (target.teamId !== piece.teamId) {
               target.teamId = piece.teamId;
@@ -463,8 +551,11 @@ function applyPurifyPulses(
         events.push({
           type: "PURIFY_PULSE",
           coord: { x, y },
+          center: { x, y },
           teamId: piece.teamId,
+          factionId: piece.teamId,
           affectedCoords,
+          affected: affectedCoords,
           remainingDuration: Math.max(0, piece.duration ?? 0),
         });
       }
@@ -509,4 +600,11 @@ function calculateWinnerTeam(board: Board, size: number): number | null {
   }
 
   return isTie ? null : winner;
+}
+
+export function resolveAction(
+  state: GameState,
+  action: Action,
+): ResolutionResult {
+  return dispatch(state, action);
 }

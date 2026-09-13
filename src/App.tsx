@@ -11,21 +11,74 @@ import {
   type SkillType,
 } from "./engine/index.ts";
 
-const SKILL_OPTIONS: { type: SkillType; label: string; color: string }[] = [
-  { type: "NONE", label: "Normal (NONE)", color: "bg-slate-700 text-white" },
-  { type: "WALL", label: "Wall (Green)", color: "bg-emerald-600 text-white" },
-  { type: "PIERCE", label: "Pierce (Blue)", color: "bg-blue-600 text-white" },
-  { type: "BOMB", label: "Bomb (Red)", color: "bg-red-600 text-white" },
-  {
-    type: "PURIFY",
+function getTeamShapeClass(teamId: number): string {
+  if (teamId === 1) {
+    return "rounded-full";
+  }
+  return "rounded-xs";
+}
+
+function getTeamShapeName(teamId: number): string {
+  if (teamId === 1) {
+    return "Circle";
+  }
+  return "Square";
+}
+
+interface SkillVisualConfig {
+  label: string;
+  pieceStyle: string;
+  buttonStyle: string;
+  code: string;
+}
+
+const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
+  NONE: {
+    label: "Normal (NONE)",
+    pieceStyle: "bg-slate-300 text-slate-900 border border-slate-400/70",
+    buttonStyle: "bg-slate-800 text-slate-200 border-slate-700",
+    code: "",
+  },
+  WALL: {
+    label: "Wall (Green)",
+    pieceStyle:
+      "bg-emerald-600/85 text-emerald-100 border border-emerald-400/60",
+    buttonStyle: "bg-emerald-950/60 text-emerald-200 border-emerald-800/80",
+    code: "W",
+  },
+  PIERCE: {
+    label: "Pierce (Blue)",
+    pieceStyle: "bg-sky-600/85 text-sky-100 border border-sky-400/60",
+    buttonStyle: "bg-sky-950/60 text-sky-200 border-sky-800/80",
+    code: "P",
+  },
+  BOMB: {
+    label: "Bomb (Red)",
+    pieceStyle: "bg-rose-600/85 text-rose-100 border border-rose-400/60",
+    buttonStyle: "bg-rose-950/60 text-rose-200 border-rose-800/80",
+    code: "B",
+  },
+  PURIFY: {
     label: "Purify (Yellow)",
-    color: "bg-amber-500 text-slate-950",
+    pieceStyle: "bg-amber-500/85 text-amber-950 border border-amber-300/60",
+    buttonStyle: "bg-amber-950/60 text-amber-200 border-amber-800/80",
+    code: "U",
   },
-  {
-    type: "COUNTER",
-    label: "Counter (Dark)",
-    color: "bg-purple-950 text-white",
+  COUNTER: {
+    label: "Counter (Purple)",
+    pieceStyle: "bg-purple-600/85 text-purple-100 border border-purple-400/60",
+    buttonStyle: "bg-purple-950/60 text-purple-200 border-purple-800/80",
+    code: "C",
   },
+};
+
+const SKILL_OPTIONS: { type: SkillType; label: string }[] = [
+  { type: "NONE", label: "Normal (NONE)" },
+  { type: "WALL", label: "Wall (Green)" },
+  { type: "PIERCE", label: "Pierce (Blue)" },
+  { type: "BOMB", label: "Bomb (Red)" },
+  { type: "PURIFY", label: "Purify (Yellow)" },
+  { type: "COUNTER", label: "Counter (Purple)" },
 ];
 
 export default function App() {
@@ -153,7 +206,7 @@ export default function App() {
 
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl">
             <div
-              className="grid gap-[2px] rounded bg-slate-800 p-[2px]"
+              className="grid gap-[2px] rounded bg-slate-800/60 p-[2px]"
               style={{
                 gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
               }}
@@ -174,28 +227,26 @@ export default function App() {
                         gameState.isGameOver || (piece !== null && !isLegal)
                       }
                       className={`relative flex h-6 w-6 items-center justify-center rounded-[2px] transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
-                        (x + y) % 2 === 0 ? "bg-slate-900" : "bg-slate-800/80"
-                      } hover:bg-slate-700/60`}
+                        (x + y) % 2 === 0
+                          ? "bg-slate-900/90"
+                          : "bg-slate-800/70"
+                      } hover:bg-slate-700/50`}
                     >
                       {/* Legal Move Marker */}
                       {isLegal && piece === null && (
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-blue-400/70" />
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400/50" />
                       )}
 
                       {/* Piece Representation */}
                       {piece && (
                         <div
-                          className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold shadow-sm sm:h-6 sm:w-6 md:h-7 md:w-7 ${
-                            piece.teamId === 1
-                              ? "border border-sky-200 bg-sky-400 text-slate-950"
-                              : "border border-rose-300 bg-rose-500 text-white"
+                          className={`flex h-5 w-5 items-center justify-center text-[9px] font-bold shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${getTeamShapeClass(
+                            piece.teamId,
+                          )} ${SKILL_CONFIG[piece.skillType].pieceStyle} ${
+                            !piece.isRevealed ? "border-dashed" : ""
                           }`}
                         >
-                          {piece.skillType === "WALL" && "W"}
-                          {piece.skillType === "PIERCE" && "P"}
-                          {piece.skillType === "BOMB" && "B"}
-                          {piece.skillType === "PURIFY" && "U"}
-                          {piece.skillType === "COUNTER" && "C"}
+                          {SKILL_CONFIG[piece.skillType].code}
                         </div>
                       )}
                     </button>
@@ -221,14 +272,15 @@ export default function App() {
 
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div
-                className={`rounded border p-3 ${
+                className={`flex flex-col gap-1 rounded-lg border p-3 transition-colors ${
                   activePlayer?.teamId === 1
-                    ? "border-sky-700 bg-sky-950/40"
-                    : "border-slate-800 bg-slate-900/40"
+                    ? "border-slate-600 bg-slate-800/80 ring-1 ring-slate-500/50"
+                    : "border-slate-800/80 bg-slate-900/40 opacity-75"
                 }`}
               >
-                <div className="text-xs font-semibold text-sky-400">
-                  Team 1 (Sky)
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                  <span className="inline-block h-3.5 w-3.5 rounded-full border border-slate-400/80 bg-slate-300" />
+                  <span>Team 1 (Circle)</span>
                 </div>
                 <div className="mt-1 text-xl font-bold text-white">
                   {team1Count.toString()}
@@ -236,14 +288,15 @@ export default function App() {
               </div>
 
               <div
-                className={`rounded border p-3 ${
+                className={`flex flex-col gap-1 rounded-lg border p-3 transition-colors ${
                   activePlayer?.teamId === 2
-                    ? "border-rose-700 bg-rose-950/40"
-                    : "border-slate-800 bg-slate-900/40"
+                    ? "border-slate-600 bg-slate-800/80 ring-1 ring-slate-500/50"
+                    : "border-slate-800/80 bg-slate-900/40 opacity-75"
                 }`}
               >
-                <div className="text-xs font-semibold text-rose-400">
-                  Team 2 (Rose)
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                  <span className="inline-block h-3.5 w-3.5 rounded-xs border border-slate-400/80 bg-slate-300" />
+                  <span>Team 2 (Square)</span>
                 </div>
                 <div className="mt-1 text-xl font-bold text-white">
                   {team2Count.toString()}
@@ -253,9 +306,17 @@ export default function App() {
 
             <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
               <span>Active Turn:</span>
-              <span className="font-semibold text-white">
-                {activePlayer?.name ?? "Unknown"} (Team{" "}
-                {activePlayer?.teamId.toString() ?? ""})
+              <span className="flex items-center gap-1.5 font-semibold text-slate-200">
+                <span
+                  className={`inline-block h-2.5 w-2.5 border border-slate-400/80 bg-slate-300 ${getTeamShapeClass(
+                    activePlayer?.teamId ?? 1,
+                  )}`}
+                />
+                <span>
+                  {activePlayer?.name ?? "Unknown"} (Team{" "}
+                  {activePlayer?.teamId.toString() ?? ""} ·{" "}
+                  {getTeamShapeName(activePlayer?.teamId ?? 1)})
+                </span>
               </span>
             </div>
 
@@ -270,26 +331,38 @@ export default function App() {
 
           {/* Skill Selector */}
           <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
-            <span className="mb-3 block text-xs font-semibold tracking-wider text-slate-400 uppercase">
-              Next Piece Skill
-            </span>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                Next Piece Skill
+              </span>
+              <span className="text-[11px] text-slate-500">Color coded</span>
+            </div>
             <div className="grid grid-cols-2 gap-2">
-              {SKILL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.type}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSkill(opt.type);
-                  }}
-                  className={`rounded border px-3 py-2 text-left text-xs font-medium transition-all ${
-                    selectedSkill === opt.type
-                      ? "border-blue-400 ring-1 ring-blue-400"
-                      : "border-transparent opacity-75 hover:opacity-100"
-                  } ${opt.color}`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              {SKILL_OPTIONS.map((opt) => {
+                const isSelected = selectedSkill === opt.type;
+                const config = SKILL_CONFIG[opt.type];
+                return (
+                  <button
+                    key={opt.type}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSkill(opt.type);
+                    }}
+                    className={`flex items-center gap-2 rounded border px-3 py-2 text-left text-xs font-medium transition-all ${
+                      isSelected
+                        ? "border-slate-300 bg-slate-800/90 text-white ring-1 ring-slate-400/60"
+                        : `${config.buttonStyle} opacity-75 hover:opacity-100`
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-xs text-[9px] font-bold ${config.pieceStyle}`}
+                    >
+                      {config.code}
+                    </span>
+                    <span className="truncate">{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

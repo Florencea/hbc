@@ -1,36 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
 import { createInitialState, dispatch } from "../pipeline.ts";
-import type { Board, GameState, Piece } from "../types.ts";
-
-function createEmptyBoard(size = 16): Board {
-  return Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null),
-  );
-}
-
-function makePiece(
-  teamId: number,
-  playerId: number,
-  skillType: Piece["skillType"] = "NONE",
-  isRevealed = false,
-): Piece {
-  return { teamId, playerId, skillType, isRevealed };
-}
-
-function makeTestState(board: Board, activePlayerId = 1): GameState {
-  return {
-    board,
-    size: 16,
-    currentTurn: 1,
-    activePlayerId,
-    players: [
-      { id: 1, teamId: 1, name: "Player 1" },
-      { id: 2, teamId: 2, name: "Player 2" },
-    ],
-    isGameOver: false,
-    winnerTeamId: null,
-  };
-}
 
 describe("pipeline", () => {
   it("initializes a standard center board", () => {
