@@ -49,10 +49,11 @@ export function makeTestState(
   board: Board,
   activePlayerId = 1,
   players?: Player[],
+  overrides?: Partial<GameState>,
 ): GameState {
   return {
     board,
-    size: 16,
+    size: board.length,
     currentTurn: 1,
     activePlayerId,
     players: players ?? [
@@ -64,5 +65,7 @@ export function makeTestState(
     mapPreset: "CROSSROADS",
     isDropPhase: false,
     dropTurnsRemaining: 0,
+    consecutivePasses: 0,
+    ...overrides,
   };
 }

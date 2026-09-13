@@ -131,6 +131,7 @@ export function createInitialState(
     mapPreset: preset,
     isDropPhase: true,
     dropTurnsRemaining: initializedPlayers.length * 2,
+    consecutivePasses: 0,
   };
 }
 
@@ -251,15 +252,37 @@ export function dispatch(
       turn: state.currentTurn + 1,
     });
 
+    const consecutivePasses = state.isDropPhase
+      ? 0
+      : (state.consecutivePasses ?? 0) + 1;
+    const isGameOver = checkGameOver(
+      newBoard,
+      state.size,
+      consecutivePasses,
+      newPlayers.length,
+      isDropPhase,
+    );
+    let winnerTeamId: number | null = null;
+    if (isGameOver) {
+      winnerTeamId = calculateWinnerTeam(newBoard, state.size);
+      events.push({
+        type: "GAME_OVER",
+        winnerTeamId,
+      });
+    }
+
     const nextState: GameState = {
       ...state,
       board: newBoard,
       currentTurn: state.currentTurn + 1,
       activePlayerId: nextPlayer.id,
       players: newPlayers,
+      isGameOver,
+      winnerTeamId,
       mapPreset: state.mapPreset,
       isDropPhase,
       dropTurnsRemaining,
+      consecutivePasses,
     };
 
     return { nextState, events };
@@ -774,7 +797,14 @@ function finalizePlacementTurn(
   });
 
   // Calculate winner if game is complete
-  const isGameOver = checkGameOver(newBoard, state.size);
+  const consecutivePasses = 0;
+  const isGameOver = checkGameOver(
+    newBoard,
+    state.size,
+    consecutivePasses,
+    newPlayers.length,
+    isDropPhase,
+  );
   let winnerTeamId: number | null = null;
   if (isGameOver) {
     winnerTeamId = calculateWinnerTeam(newBoard, state.size);
@@ -795,6 +825,7 @@ function finalizePlacementTurn(
     mapPreset: state.mapPreset,
     isDropPhase,
     dropTurnsRemaining,
+    consecutivePasses,
   };
 
   return { nextState, events };
@@ -889,15 +920,34 @@ function applyPurifyPulses(
   }
 }
 
-function checkGameOver(board: Board, size: number): boolean {
+function checkGameOver(
+  board: Board,
+  size: number,
+  consecutivePasses: number,
+  playerCount: number,
+  isDropPhase: boolean,
+): boolean {
+  // 1. Consecutive passes reached or exceeded player count outside drop phase (nobody can move)
+  if (!isDropPhase && consecutivePasses >= playerCount) {
+    return true;
+  }
+
+  // 2. Full board (no empty cells left)
+  let hasEmptyCell = false;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       if (board[y]?.[x] === null) {
-        return false;
+        hasEmptyCell = true;
+        break;
       }
     }
+    if (hasEmptyCell) break;
   }
-  return true;
+  if (!hasEmptyCell) {
+    return true;
+  }
+
+  return false;
 }
 
 function calculateWinnerTeam(board: Board, size: number): number | null {
@@ -905,7 +955,7 @@ function calculateWinnerTeam(board: Board, size: number): number | null {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const piece = board[y]?.[x];
-      if (piece) {
+      if (piece && piece.teamId !== 0) {
         counts.set(piece.teamId, (counts.get(piece.teamId) ?? 0) + 1);
       }
     }

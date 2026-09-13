@@ -6,6 +6,7 @@ import {
   playFlipSound,
   playPlaceSound,
   playPurifySound,
+  playGameOverSound,
 } from "./sound.ts";
 
 export type CombatTextVariant =
@@ -43,6 +44,7 @@ export interface EventHandlers {
   ) => void;
   onTriggerScreenShake?: (durationMs?: number) => void;
   onTriggerScreenFlash?: (color: string, durationMs?: number) => void;
+  onGameOver?: (winnerTeamId: number | null) => void;
   delayFn?: (ms: number) => Promise<void>;
 }
 
@@ -148,6 +150,13 @@ export async function playEvents(
         handlers.onAddFloatingText?.("救贖之光 淨化！", event.coord, "purify");
         playPurifySound();
         await delay(250);
+        break;
+      }
+
+      case "GAME_OVER": {
+        handlers.onGameOver?.(event.winnerTeamId);
+        playGameOverSound();
+        await delay(200);
         break;
       }
 

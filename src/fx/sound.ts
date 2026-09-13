@@ -290,3 +290,32 @@ export function playPurifySound(): void {
     osc.stop(now + 0.46);
   }
 }
+
+/**
+ * Game Over victory fanfare chord.
+ */
+export function playGameOverSound(): void {
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+
+  notes.forEach((freq, idx) => {
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now + idx * 0.08);
+    gain.gain.linearRampToValueAtTime(0.15, now + idx * 0.08 + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.6);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now + idx * 0.08);
+    osc.stop(now + idx * 0.08 + 0.65);
+  });
+}

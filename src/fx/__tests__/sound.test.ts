@@ -7,6 +7,7 @@ import {
   playFlipSound,
   playPlaceSound,
   playPurifySound,
+  playGameOverSound,
   setAudioMuted,
   toggleAudioMuted,
 } from "../sound.ts";
@@ -43,6 +44,9 @@ describe("sound synthesizer", () => {
     }).not.toThrow();
     expect(() => {
       playPurifySound();
+    }).not.toThrow();
+    expect(() => {
+      playGameOverSound();
     }).not.toThrow();
 
     setAudioMuted(true);

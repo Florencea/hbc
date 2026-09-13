@@ -55,6 +55,7 @@ export interface GameState {
   mapPreset: MapPreset;
   isDropPhase: boolean;
   dropTurnsRemaining: number;
+  consecutivePasses?: number;
 }
 
 export interface MaskedPiece {
@@ -76,6 +77,7 @@ export interface MaskedGameState {
   mapPreset: MapPreset;
   isDropPhase: boolean;
   dropTurnsRemaining: number;
+  consecutivePasses?: number;
 }
 
 export type GameEvent =
