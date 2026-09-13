@@ -176,26 +176,33 @@ function clonePlayers(players: Player[]): Player[] {
 function applyTurnEndUpkeep(player: Player, events: GameEvent[]): void {
   const skillKeys = Object.keys(SKILL_SPECS) as (keyof typeof SKILL_SPECS)[];
   for (const skill of skillKeys) {
+    if (player.hand[skill] >= SKILL_SPECS[skill].maxHand) {
+      player.charge[skill] = 0;
+      continue;
+    }
+
     player.charge[skill] += 1;
     if (player.charge[skill] >= SKILL_SPECS[skill].cd) {
-      if (player.hand[skill] < SKILL_SPECS[skill].maxHand) {
-        player.hand[skill] += 1;
-        player.charge[skill] = 0;
-        events.push({
-          type: "SKILL_ACQUIRED",
-          playerId: player.id,
-          skillType: skill,
-          currentHandCount: player.hand[skill],
-        });
-      } else if (player.hand[skill] === SKILL_SPECS[skill].maxHand) {
-        player.isForcedSpecial = true;
-        player.charge[skill] = SKILL_SPECS[skill].cd;
-        events.push({
-          type: "FORCED_SPECIAL_TRIGGERED",
-          playerId: player.id,
-        });
-      }
+      player.hand[skill] += 1;
+      player.charge[skill] = 0;
+      events.push({
+        type: "SKILL_ACQUIRED",
+        playerId: player.id,
+        skillType: skill,
+        currentHandCount: player.hand[skill],
+      });
     }
+  }
+
+  const isHandSaturated = skillKeys.every(
+    (skill) => player.hand[skill] >= SKILL_SPECS[skill].maxHand,
+  );
+  if (isHandSaturated && !player.isForcedSpecial) {
+    player.isForcedSpecial = true;
+    events.push({
+      type: "FORCED_SPECIAL_TRIGGERED",
+      playerId: player.id,
+    });
   }
 }
 

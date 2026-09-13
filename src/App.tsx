@@ -166,15 +166,15 @@ const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     effect:
       "遵循經典黑白棋規則，在 8 個方向的任一直線上夾住敵方棋子並將其全數翻轉。此棋為建構地盤與拓荒推進的基本單位。",
     tactics:
-      "注意：當任一特殊棋庫存已滿且再度充能完畢時，將觸發「強制特技」，該回合將被鎖定禁止放置常規棋。",
+      "注意：當所有特殊棋庫存已滿且無法繼續充能時，將觸發「強制特技」，該回合將被鎖定禁止放置常規棋。",
   },
   WALL: {
     name: "翡翠城壁",
     role: "射線攔截者",
     badge: "綠色防禦",
     badgeColor: "border-emerald-500/50 bg-emerald-950/80 text-emerald-300",
-    cdText: "3 回合",
-    maxHandText: "2 枚",
+    cdText: "4 回合",
+    maxHandText: "1 枚",
     trigger: "常駐被動格擋",
     effect:
       "格擋敵方射線穿透，不可被常規夾擊翻轉。反擊（COUNTER）逆轉路徑遇城壁亦會停止。僅能被「殺戮盛宴」引爆或「救贖之光」淨化。",
@@ -186,8 +186,8 @@ const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     role: "穿透突防者",
     badge: "藍色突擊",
     badgeColor: "border-cyan-400/50 bg-sky-950/80 text-cyan-300",
-    cdText: "2 回合",
-    maxHandText: "3 枚",
+    cdText: "3 回合",
+    maxHandText: "2 枚",
     trigger: "主動落子貫穿",
     effect:
       "射線無視敵方「翡翠城壁」阻擋直接貫穿翻轉，且在翻轉敵方「深淵復仇者」時完全免疫其反噬。行使穿透或免疫特性時揭示真身。",
@@ -199,8 +199,8 @@ const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     role: "範圍爆破者",
     badge: "紅色毀滅",
     badgeColor: "border-rose-400/50 bg-rose-950/80 text-rose-300",
-    cdText: "2 回合",
-    maxHandText: "3 枚",
+    cdText: "4 回合",
+    maxHandText: "2 枚",
     trigger: "被翻轉/連鎖引爆",
     effect:
       "被射線翻轉、被反擊波及或被相鄰炸彈波及時引爆，摧毀周圍 3x3 範圍內所有棋子（含友軍與城壁）並轉化為引爆方常規棋；引爆後自身亦化為常規棋。",
@@ -212,8 +212,8 @@ const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     role: "範圍淨化者",
     badge: "黃色中和",
     badgeColor: "border-amber-400/50 bg-amber-950/80 text-amber-300",
-    cdText: "4 回合",
-    maxHandText: "2 枚",
+    cdText: "5 回合",
+    maxHandText: "1 枚",
     trigger: "每回合結束脈衝",
     effect:
       "放置後每回合結束時向周圍 3x3 釋放淨化光環，持續 3 回合（duration: 3）後自毀衰退。範圍內所有敵我特殊棋無聲轉化為施放方之常規棋（不觸發炸彈與反擊）。",
@@ -225,7 +225,7 @@ const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     role: "致命反噬陷阱",
     badge: "黑紫反擊",
     badgeColor: "border-purple-500/50 bg-purple-950/80 text-purple-300",
-    cdText: "5 回合",
+    cdText: "7 回合",
     maxHandText: "1 枚",
     trigger: "被敵方翻轉時",
     effect:
@@ -366,13 +366,13 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 /**
  * Priority order when forced special is triggered:
  * Furthest down the list, longest cooldown, most powerful:
- * COUNTER (CD 5) -> PURIFY (CD 4) -> WALL (CD 3) -> BOMB (CD 2) -> PIERCE (CD 2)
+ * COUNTER (CD 7) -> PURIFY (CD 5) -> BOMB (CD 4) / WALL (CD 4) -> PIERCE (CD 3)
  */
 const FORCED_SPECIAL_PRIORITY: Exclude<SkillType, "NONE">[] = [
   "COUNTER",
   "PURIFY",
-  "WALL",
   "BOMB",
+  "WALL",
   "PIERCE",
 ];
 

@@ -10,11 +10,11 @@ export const SKILL_SPECS: Record<
   Exclude<SkillType, "NONE">,
   { cd: number; maxHand: number }
 > = {
-  WALL: { cd: 3, maxHand: 2 },
-  PIERCE: { cd: 2, maxHand: 3 },
-  BOMB: { cd: 2, maxHand: 3 },
-  PURIFY: { cd: 4, maxHand: 2 },
-  COUNTER: { cd: 5, maxHand: 1 },
+  PIERCE: { cd: 3, maxHand: 2 },
+  BOMB: { cd: 4, maxHand: 2 },
+  WALL: { cd: 4, maxHand: 1 },
+  PURIFY: { cd: 5, maxHand: 1 },
+  COUNTER: { cd: 7, maxHand: 1 },
 };
 
 export interface Piece {

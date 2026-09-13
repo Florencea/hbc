@@ -102,45 +102,47 @@ Special pieces cannot be placed infinitely. Players operate under an energy char
 
 ```
 Skill Specifications:
-- WALL:    CD = 3 turns, Max Hand = 2
-- PIERCE:  CD = 2 turns, Max Hand = 3
-- BOMB:    CD = 2 turns, Max Hand = 3
-- PURIFY:  CD = 4 turns, Max Hand = 2
-- COUNTER: CD = 5 turns, Max Hand = 1
+- PIERCE:  CD = 3 turns, Max Hand = 2
+- BOMB:    CD = 4 turns, Max Hand = 2
+- WALL:    CD = 4 turns, Max Hand = 1
+- PURIFY:  CD = 5 turns, Max Hand = 1
+- COUNTER: CD = 7 turns, Max Hand = 1
 ```
 
-### Turn-End Upkeep Routine
+### Turn-End Upkeep Routine & Cap Freeze Rule
 
-At the end of every active turn (after piece placement or pass):
+At the end of every active turn (after piece placement):
 
-1. For each skill in `SKILL_SPECS`:
-   - Increment `player.charge[skill]` by 1.
-   - If `charge[skill] >= SKILL_SPECS[skill].cd`:
-     - If `hand[skill] < SKILL_SPECS[skill].maxHand`:
+1. **Cap Freeze & Charge Accumulation**: For each skill in `SKILL_SPECS`:
+   - If `hand[skill] >= SKILL_SPECS[skill].maxHand`:
+     - Hand capacity is reached. Charge accumulation is frozen! Keep `charge[skill] = 0`.
+   - Else (`hand[skill] < SKILL_SPECS[skill].maxHand`):
+     - Increment `player.charge[skill]` by 1.
+     - If `charge[skill] >= SKILL_SPECS[skill].cd`:
        - `hand[skill] += 1`
        - `charge[skill] = 0`
        - Emit `SKILL_ACQUIRED` event.
-     - Else if `hand[skill] === SKILL_SPECS[skill].maxHand`:
-       - Hand is capped!
-       - Set `player.isForcedSpecial = true`.
-       - Clamp `charge[skill] = SKILL_SPECS[skill].cd`.
-       - Emit `FORCED_SPECIAL_TRIGGERED` event.
+
+2. **Hand Saturation Check**:
+   - If all special skills have reached their respective `maxHand` caps (total inventory saturation: 2 + 2 + 1 + 1 + 1 = 7 special pieces):
+     - Set `player.isForcedSpecial = true`.
+     - Emit `FORCED_SPECIAL_TRIGGERED` event.
 
 ---
 
 ## 5. Forced Discharge Mechanism
 
-To prevent skill hoarding and ensure dynamic high-stakes gameplay:
+To prevent perpetual skill hoarding while avoiding immediate refill loops:
 
-- **Trigger**: When a player reaches their hand cap for any skill and completes its cooldown cycle again, their energy overflows, activating `isForcedSpecial: true`.
+- **Trigger**: Only triggers `isForcedSpecial: true` when ALL special skills have reached their `maxHand` capacity and cannot receive charges (the special hand inventory is completely saturated).
 - **Enforcement**: On their next turn, the player **MUST** play a special piece (`action.skillType !== "NONE"`). Attempting to place a standard `NONE` piece throws:
   ```
   "Forced special move required: hand cap reached"
   ```
-- **Discharge**: When a valid special skill is played:
+- **Discharge & Charge Unfreeze**: When a valid special skill is played:
   - The skill count is decremented in `player.hand[action.skillType]`.
-  - `player.isForcedSpecial` is reset to `false`.
-  - At turn end, any completed charges for skills that now have capacity will replenish normally.
+  - `player.isForcedSpecial` is immediately reset to `false`.
+  - Decrementing hand capacity below `maxHand` unfreezes the skill, allowing it to resume accumulating charges from 0 on subsequent turns.
 
 ---
 

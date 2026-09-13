@@ -135,8 +135,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     board[3][2] = makePiece(2, 2, "NONE");
     board[4][2] = makePiece(1, 1, "NONE");
 
-    // PIERCE has CD = 2, maxHand = 3
-    // Set charge to 1 so that after 1 move it reaches CD (2)
+    // PIERCE has CD = 3, maxHand = 2
+    // Set charge to 2 (cd - 1) so that after 1 move it reaches CD (3)
     const players = [
       createEconomyPlayer(1, 1, "Player 1", {
         hand: {
@@ -147,7 +147,14 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
           PURIFY: 0,
           COUNTER: 0,
         },
-        charge: { NONE: 0, WALL: 0, PIERCE: 1, BOMB: 0, PURIFY: 0, COUNTER: 0 },
+        charge: {
+          NONE: 0,
+          WALL: 0,
+          PIERCE: SKILL_SPECS.PIERCE.cd - 1,
+          BOMB: 0,
+          PURIFY: 0,
+          COUNTER: 0,
+        },
       }),
       createEconomyPlayer(2, 2, "Player 2"),
     ];
@@ -181,17 +188,16 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     board[3][2] = makePiece(2, 2, "NONE");
     board[4][2] = makePiece(1, 1, "NONE");
 
-    // BOMB: CD = 2, maxHand = 3
-    // Hand is already capped at 3, charge is at 1 (1 turn away from CD)
+    // All skills at maxHand except BOMB which is at maxHand - 1 with charge at cd - 1
     const players = [
       createEconomyPlayer(1, 1, "Player 1", {
         hand: {
           NONE: Infinity,
-          WALL: 0,
-          PIERCE: 0,
-          BOMB: SKILL_SPECS.BOMB.maxHand,
-          PURIFY: 0,
-          COUNTER: 0,
+          WALL: SKILL_SPECS.WALL.maxHand,
+          PIERCE: SKILL_SPECS.PIERCE.maxHand,
+          BOMB: SKILL_SPECS.BOMB.maxHand - 1,
+          PURIFY: SKILL_SPECS.PURIFY.maxHand,
+          COUNTER: SKILL_SPECS.COUNTER.maxHand,
         },
         charge: {
           NONE: 0,
@@ -215,6 +221,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     });
 
     const player1After = nextState.players.find((p) => p.id === 1);
+    expect(player1After?.hand.BOMB).toBe(SKILL_SPECS.BOMB.maxHand);
+    expect(player1After?.charge.BOMB).toBe(0);
     expect(player1After?.isForcedSpecial).toBe(true);
 
     const forcedEvent = events.find(
@@ -354,5 +362,114 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     expect(teammate?.hand.PIERCE).toBe(3);
     expect(teammate?.hand.BOMB).toBe(1);
     expect(teammate?.charge.WALL).toBe(2);
+  });
+
+  it("charge_freezes_when_hand_is_at_cap: A player holding max hand capacity for a skill does not accumulate charge points for that skill", () => {
+    const board = createEmptyBoard(16);
+    board[3][2] = makePiece(2, 2, "NONE");
+    board[4][2] = makePiece(1, 1, "NONE");
+
+    // PIERCE is at maxHand (2), charge is 0. BOMB is at 0, charge is 0.
+    const players = [
+      createEconomyPlayer(1, 1, "Player 1", {
+        hand: {
+          NONE: Infinity,
+          WALL: 0,
+          PIERCE: SKILL_SPECS.PIERCE.maxHand,
+          BOMB: 0,
+          PURIFY: 0,
+          COUNTER: 0,
+        },
+        charge: {
+          NONE: 0,
+          WALL: 0,
+          PIERCE: 0,
+          BOMB: 0,
+          PURIFY: 0,
+          COUNTER: 0,
+        },
+      }),
+      createEconomyPlayer(2, 2, "Player 2"),
+    ];
+
+    const state = makeEconomyTestState(board, players, 1);
+
+    const { nextState, events } = dispatch(state, {
+      type: "PLACE_PIECE",
+      playerId: 1,
+      coord: { x: 2, y: 2 },
+      skillType: "NONE",
+    });
+
+    const player1After = nextState.players.find((p) => p.id === 1);
+    // PIERCE must remain at maxHand and charge must NOT increment (frozen at 0)
+    expect(player1After?.hand.PIERCE).toBe(SKILL_SPECS.PIERCE.maxHand);
+    expect(player1After?.charge.PIERCE).toBe(0);
+
+    // Uncapped skill (BOMB) must accumulate charge normally
+    expect(player1After?.charge.BOMB).toBe(1);
+
+    // No SKILL_ACQUIRED event for PIERCE
+    const pierceAcquired = events.find(
+      (e) => e.type === "SKILL_ACQUIRED" && e.skillType === "PIERCE",
+    );
+    expect(pierceAcquired).toBeUndefined();
+
+    // Not saturated across all skills, so isForcedSpecial must remain false
+    expect(player1After?.isForcedSpecial).toBe(false);
+  });
+
+  it("charge_resumes_after_skill_consumed: After placing a skill from max hand, the skill count decrements and charge resumes from 0 on the next turn", () => {
+    const board = createEmptyBoard(16);
+    board[3][2] = makePiece(2, 2, "NONE");
+    board[4][2] = makePiece(1, 1, "NONE");
+
+    // Player 1 holds maxHand PIERCE (2) with charge frozen at 0
+    const players = [
+      createEconomyPlayer(1, 1, "Player 1", {
+        hand: {
+          NONE: Infinity,
+          WALL: 0,
+          PIERCE: SKILL_SPECS.PIERCE.maxHand,
+          BOMB: 0,
+          PURIFY: 0,
+          COUNTER: 0,
+        },
+        charge: {
+          NONE: 0,
+          WALL: 0,
+          PIERCE: 0,
+          BOMB: 0,
+          PURIFY: 0,
+          COUNTER: 0,
+        },
+      }),
+      createEconomyPlayer(2, 2, "Player 2"),
+    ];
+
+    const state = makeEconomyTestState(board, players, 1);
+
+    // Player 1 places PIERCE from max hand
+    const { nextState } = dispatch(state, {
+      type: "PLACE_PIECE",
+      playerId: 1,
+      coord: { x: 2, y: 2 },
+      skillType: "PIERCE",
+    });
+
+    const player1After = nextState.players.find((p) => p.id === 1);
+    // Count decremented below maxHand: (2 -> 1)
+    expect(player1After?.hand.PIERCE).toBe(SKILL_SPECS.PIERCE.maxHand - 1);
+    // Charge unfreezes and resumes accumulating from 0 (gains +1 at placement turn end)
+    expect(player1After?.charge.PIERCE).toBe(1);
+    expect(player1After?.isForcedSpecial).toBe(false);
+  });
+
+  it("rebalanced_specs_adhere_to_matrix: Verify all skills conform to the new (3, 4, 4, 5, 7) cooldown values", () => {
+    expect(SKILL_SPECS.PIERCE).toEqual({ cd: 3, maxHand: 2 });
+    expect(SKILL_SPECS.BOMB).toEqual({ cd: 4, maxHand: 2 });
+    expect(SKILL_SPECS.WALL).toEqual({ cd: 4, maxHand: 1 });
+    expect(SKILL_SPECS.PURIFY).toEqual({ cd: 5, maxHand: 1 });
+    expect(SKILL_SPECS.COUNTER).toEqual({ cd: 7, maxHand: 1 });
   });
 });
