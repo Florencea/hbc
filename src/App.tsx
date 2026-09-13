@@ -429,7 +429,14 @@ export default function App() {
           currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
             row.map((cell, rX) =>
               rX === pos.x && rY === pos.y && cell
-                ? { ...cell, teamId: toTeamId }
+                ? {
+                    ...cell,
+                    teamId: toTeamId,
+                    skillType:
+                      cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                    duration: undefined,
+                    isRevealed: true,
+                  }
                 : cell,
             ),
           );
@@ -466,7 +473,17 @@ export default function App() {
                 reversedSet.has(`${rX.toString()},${rY.toString()}`) &&
                 cell
               ) {
-                return { ...cell, teamId: defenderTeamId };
+                if (cell.skillType === "PIERCE") {
+                  return { ...cell, isRevealed: true };
+                }
+                return {
+                  ...cell,
+                  teamId: defenderTeamId,
+                  skillType:
+                    cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                  duration: undefined,
+                  isRevealed: true,
+                };
               }
               return cell;
             }),
@@ -480,7 +497,17 @@ export default function App() {
           currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
             row.map((cell, rX) => {
               if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
-                return { ...cell, teamId };
+                if (cell.skillType === "PIERCE") {
+                  return { ...cell, isRevealed: true };
+                }
+                return {
+                  ...cell,
+                  teamId,
+                  skillType:
+                    cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                  duration: undefined,
+                  isRevealed: true,
+                };
               }
               return cell;
             }),
@@ -503,7 +530,16 @@ export default function App() {
                 affectedSet.has(`${rX.toString()},${rY.toString()}`) &&
                 cell
               ) {
-                return { ...cell, teamId };
+                const nextSkill =
+                  cell.skillType === "BOMB" || cell.skillType === "COUNTER"
+                    ? "NONE"
+                    : cell.skillType;
+                return {
+                  ...cell,
+                  teamId,
+                  skillType: nextSkill,
+                  isRevealed: true,
+                };
               }
               return cell;
             }),

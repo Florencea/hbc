@@ -30,6 +30,53 @@ In addition to standard pieces (`NONE`), players can deploy 5 specialized skill 
 | **`PURIFY`**  | Yellow | `U`  | **Neutralization Pulse**: Revealed immediately upon placement. Emits a 3x3 pulse at turn end that quietly converts enemy pieces without triggering traps (`BOMB` or `COUNTER` silently neutralize to `NONE`). | 3-turn lifespan (`duration = 3`). Decays by 1 each turn end. Dissolves to `NONE` when duration reaches 0.                                      |
 | **`COUNTER`** | Black  | `C`  | **Batch Hijacker Trap**: When flipped by a non-`PIERCE` piece, triggers a counter backlash that reverses the entire active flip line/batch and placed piece to the defender's team.                           | Consumed to `NONE` and revealed upon triggering. If a `WALL` stands in the backlash path, the placed piece is protected from reversal.         |
 
+### 5-Skill Interaction Matrix & Resolution Hierarchy
+
+This section formally defines the resolution outcomes when special skills interact during active placement, raycasting, and chain reaction phases.
+
+#### 1. Interaction Matrix
+
+| Active Source / Triggered By \ Target Piece | WALL (1x1 Pillar)                                          | PIERCE (Singularity)                                               | BOMB (Detonation)                                                        | PURIFY (Domain)                                  | COUNTER (Backlash)                                                               |
+| :------------------------------------------ | :--------------------------------------------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- | :----------------------------------------------- | :------------------------------------------------------------------------------- |
+| **Standard Raycast**                        | Terminated (`break`). Ray stops; hidden WALL is revealed.  | Treated as standard piece; flipped normally.                       | Flipped normally; triggers 3x3 BOMB detonation.                          | Flipped normally; clears ongoing duration timer. | Flipped normally; triggers COUNTER backlash.                                     |
+| **PIERCE (Active Attacker)**                | Penetrates WALL. WALL is flipped; PIERCE is revealed.      | Treated as standard piece; flipped normally.                       | Flipped normally; triggers 3x3 BOMB detonation.                          | Flipped normally; clears ongoing duration timer. | Flipped normally; **COUNTER is bypassed and does NOT trigger**.                  |
+| **BOMB (3x3 Detonation)**                   | Destroyed and converted to exploding faction.              | **IMMUNE**. Position and faction remain unchanged; reveals PIERCE. | **CHAINS**. Enqueued into BFS queue; detonates in sequence.              | Destroyed and converted to exploding faction.    | **CROSSFIRE TRIGGER**. Detonation crossfire triggers COUNTER backlash.           |
+| **PURIFY (3x3 Turn-End Pulse)**             | Silently converted to Purify's faction.                    | **IMMUNE**. Position and faction remain unchanged; reveals PIERCE. | **SILENT CONVERSION**. Converted to normal piece; **does NOT detonate**. | Replaced/assimilated by active Purify faction.   | **SILENT CONVERSION**. Converted to normal piece; **does NOT trigger backlash**. |
+| **COUNTER (Backlash Stream)**               | **BLOCKS BACKLASH**. Ray-like backlash terminates at WALL. | **IMMUNE**. Position and faction remain unchanged; reveals PIERCE. | **ENGULFED / DETONATES**. Caught in backlash; pushed to BFS bomb queue.  | Overwritten by defender faction.                 | **SECONDARY BACKLASH**. If another COUNTER is hit, initiates secondary reversal. |
+
+---
+
+#### 2. Detailed Interaction Semantics
+
+1. **WALL Interception & Line-of-Fire**:
+   - `WALL` acts as a 1x1 absolute obstacle to both forward raycasts and backward `COUNTER` backlash lines.
+   - Only `PIERCE` can pass through a `WALL` during sandwich verification and execution.
+   - `WALL` possesses no area-of-effect defense: it can be overwritten and neutralized by adjacent `BOMB` detonations or `PURIFY` pulses.
+
+2. **PIERCE Immunity Scope**:
+   - **Raycast**: Penetrates `WALL` obstacles without being blocked.
+   - **Trap Immunity**: Safely flips enemy `COUNTER` pieces without triggering the reverse-engulf effect.
+   - **Area Effect Immunity**: Ignores both `BOMB` 3x3 explosive damage and `PURIFY` 3x3 assimilation pulses. PIERCE pieces never change faction due to non-direct sandwich captures.
+   - **Reveal Condition**: An unrevealed `PIERCE` piece reveals its true identity to all players whenever its penetration or immunity properties are exercised.
+
+3. **BOMB Chain Detonation & Crossfire**:
+   - Detonates in a 3x3 area around its coordinate upon being flipped by a raycast, engulfed by a `COUNTER` backlash, or hit by an adjacent `BOMB` blast.
+   - All chain reactions are resolved sequentially using a BFS queue (`Queue<BombEvent>`) to maintain deterministic order and prevent recursion deadlocks.
+   - If an unrevealed enemy `COUNTER` is caught within the 3x3 explosion radius, it is triggered via crossfire, initiating backlash outward from its position.
+   - Detonated `BOMB` pieces revert to standard pieces (`skillType: 'NONE'`) belonging to the exploding faction.
+
+4. **PURIFY Non-Violent Neutralization**:
+   - `PURIFY` pulses once per round at turn end in a 3x3 area for 3 consecutive rounds (`duration: 3`).
+   - Assimilating enemy pieces via `PURIFY` does **NOT** count as a flip or sandwich capture.
+   - Consequently, enemy `BOMB` and `COUNTER` pieces caught in a `PURIFY` pulse are silently converted into normal pieces of the purifying faction without triggering explosions or backlash.
+
+5. **COUNTER Reversal & Termination**:
+   - Triggered when an enemy piece (except `PIERCE`) flips the hidden `COUNTER` piece.
+   - Reverses the entire active capture batch, converting the placed enemy piece and all captured intermediate pieces to the defender's faction.
+   - If the backlash path contains a friendly or enemy `WALL`, the reversal is stopped at that coordinate.
+   - If the backlash path engulfs an unexploded `BOMB`, the bomb detonates and pushes a new explosion event to the resolution pipeline.
+   - Once activated, the `COUNTER` piece reverts to a standard piece (`skillType: 'NONE'`).
+
 ---
 
 ## 3. Information Asymmetry & Fog of War

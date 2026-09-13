@@ -221,7 +221,7 @@ export function dispatch(
     }
 
     // Apply Purify pulses at turn end
-    applyPurifyPulses(newBoard, state.size, events);
+    applyPurifyPulses(newBoard, state.size, events, attacker.teamId);
 
     // Apply Turn-End Upkeep
     applyTurnEndUpkeep(attacker, events);
@@ -514,8 +514,28 @@ export function dispatch(
         }
         const p = newBoard[c.y]?.[c.x];
         if (p) {
+          // PIERCE is immune to backlash stream: position and faction remain unchanged; reveals PIERCE.
+          if (p.skillType === "PIERCE") {
+            if (!p.isRevealed) {
+              p.isRevealed = true;
+              events.push({
+                type: "PIECE_REVEALED",
+                coord: c,
+                pos: c,
+                skillType: "PIERCE",
+                reason: "TRIGGER",
+              });
+            }
+            continue;
+          }
+
           p.teamId = defenderTeamId;
           p.playerId = defenderPlayerId;
+          if (p.skillType !== "BOMB") {
+            p.skillType = "NONE";
+            p.duration = undefined;
+            p.isRevealed = true;
+          }
           reversedCoords.push(c);
         }
       }
@@ -598,6 +618,11 @@ export function dispatch(
             bombQueue.push({ coord: c, teamId: originalPiece.teamId });
             processedBombs.add(key);
           }
+        } else {
+          // When captured/eaten by sandwiching, special skill is consumed and reverts to standard piece 'NONE'
+          currentPiece.skillType = "NONE";
+          currentPiece.duration = undefined;
+          currentPiece.isRevealed = true;
         }
       }
     }
@@ -718,7 +743,7 @@ function finalizePlacementTurn(
   events: GameEvent[],
 ): { nextState: GameState; events: GameEvent[] } {
   // Apply turn-end PURIFY pulses
-  applyPurifyPulses(newBoard, state.size, events);
+  applyPurifyPulses(newBoard, state.size, events, attacker.teamId);
 
   // Turn-end upkeep: charges and skill acquisition for action.playerId
   applyTurnEndUpkeep(attacker, events);
@@ -779,69 +804,88 @@ function applyPurifyPulses(
   board: Board,
   size: number,
   events: GameEvent[],
+  activeTeamId?: number,
 ): void {
+  const purifyPieces: { coord: Coord; piece: Piece }[] = [];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const piece = board[y]?.[x];
       if (piece?.skillType === "PURIFY") {
-        const affectedCoords: Coord[] = [];
-
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (!isValidCoord(size, { x: nx, y: ny })) continue;
-
-            const target = board[ny]?.[nx];
-            if (!target) continue;
-
-            // PIERCE piece is immune to Purify
-            if (target.skillType === "PIERCE") {
-              if (!target.isRevealed) {
-                target.isRevealed = true;
-                events.push({
-                  type: "PIECE_REVEALED",
-                  coord: { x: nx, y: ny },
-                  pos: { x: nx, y: ny },
-                  skillType: "PIERCE",
-                  reason: "AURA",
-                });
-              }
-              continue;
-            }
-
-            if (target.teamId !== piece.teamId) {
-              target.teamId = piece.teamId;
-              // Silently dissolves BOMB/COUNTER without triggering
-              if (
-                target.skillType === "BOMB" ||
-                target.skillType === "COUNTER"
-              ) {
-                target.skillType = "NONE";
-                target.isRevealed = true;
-              }
-              affectedCoords.push({ x: nx, y: ny });
-            }
-          }
-        }
-
-        piece.duration = (piece.duration ?? 3) - 1;
-        if (piece.duration <= 0) {
-          piece.skillType = "NONE";
-        }
-
-        events.push({
-          type: "PURIFY_PULSE",
-          coord: { x, y },
-          center: { x, y },
-          teamId: piece.teamId,
-          factionId: piece.teamId,
-          affectedCoords,
-          affected: affectedCoords,
-          remainingDuration: Math.max(0, piece.duration ?? 0),
-        });
+        purifyPieces.push({ coord: { x, y }, piece });
       }
     }
+  }
+
+  // Active faction's PURIFY pulses take precedence (matrix: "Replaced/assimilated by active Purify faction")
+  if (activeTeamId !== undefined) {
+    purifyPieces.sort((a, b) => {
+      const aActive = a.piece.teamId === activeTeamId ? 1 : 0;
+      const bActive = b.piece.teamId === activeTeamId ? 1 : 0;
+      return bActive - aActive;
+    });
+  }
+
+  for (const { coord, piece } of purifyPieces) {
+    if (piece.skillType !== "PURIFY") continue;
+
+    const affectedCoords: Coord[] = [];
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = coord.x + dx;
+        const ny = coord.y + dy;
+        if (!isValidCoord(size, { x: nx, y: ny })) continue;
+
+        const target = board[ny]?.[nx];
+        if (!target) continue;
+
+        // PIERCE piece is immune to Purify
+        if (target.skillType === "PIERCE") {
+          if (!target.isRevealed) {
+            target.isRevealed = true;
+            events.push({
+              type: "PIECE_REVEALED",
+              coord: { x: nx, y: ny },
+              pos: { x: nx, y: ny },
+              skillType: "PIERCE",
+              reason: "AURA",
+            });
+          }
+          continue;
+        }
+
+        if (target.teamId !== piece.teamId) {
+          target.teamId = piece.teamId;
+          // Silently dissolves BOMB/COUNTER without triggering
+          if (target.skillType === "BOMB" || target.skillType === "COUNTER") {
+            target.skillType = "NONE";
+            target.isRevealed = true;
+          } else if (
+            target.skillType === "WALL" ||
+            target.skillType === "PURIFY"
+          ) {
+            target.isRevealed = true;
+          }
+          affectedCoords.push({ x: nx, y: ny });
+        }
+      }
+    }
+
+    piece.duration = (piece.duration ?? 3) - 1;
+    if (piece.duration <= 0) {
+      piece.skillType = "NONE";
+    }
+
+    events.push({
+      type: "PURIFY_PULSE",
+      coord: coord,
+      center: coord,
+      teamId: piece.teamId,
+      factionId: piece.teamId,
+      affectedCoords,
+      affected: affectedCoords,
+      remainingDuration: Math.max(0, piece.duration ?? 0),
+    });
   }
 }
 
