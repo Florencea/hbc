@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BoardOverlay,
   type AuraPulseEffect,
@@ -11,11 +11,13 @@ import {
   type CombatTextItem,
 } from "./components/FloatingCombatText.tsx";
 import {
+  collectAllRaycasts,
   createInitialGame,
   dispatch,
   getAvailableMoves,
   isWithinDropZone,
   sanitizeForViewer,
+  selectBestMove,
   SKILL_SPECS,
   type Board,
   type Coord,
@@ -204,7 +206,12 @@ const FORCED_SPECIAL_PRIORITY: Exclude<SkillType, "NONE">[] = [
 function getNextSelectedSkill(
   nextState: GameState,
   currentSkill: SkillType,
+  isVsBot = false,
 ): SkillType {
+  // When playing against bot, do not mutate human's selected skill during bot's turn
+  if (isVsBot && nextState.activePlayerId === 2) {
+    return currentSkill;
+  }
   const incomingPlayer = nextState.players.find(
     (p) => p.id === nextState.activePlayerId,
   );
@@ -230,11 +237,13 @@ export default function App() {
   );
   const [selectedSkill, setSelectedSkill] = useState<SkillType>("NONE");
   const [isGodMode, setIsGodMode] = useState<boolean>(true);
+  const [isVsBot, setIsVsBot] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(() => isAudioMuted());
   const [eventLogs, setEventLogs] = useState<GameEvent[]>(
     () => createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).events,
   );
   const [toast, setToast] = useState<ToastNotification | null>(null);
+  const [hoveredCoord, setHoveredCoord] = useState<Coord | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -294,18 +303,26 @@ export default function App() {
     return selectedSkill;
   })();
 
-  const displayedState = isGodMode
-    ? gameState
-    : sanitizeForViewer(gameState, gameState.activePlayerId);
+  const isBotTurn = isVsBot && gameState.activePlayerId === 2;
+
+  // In vs Bot mode, human is Player 1 (team 1). The perspective must remain Player 1's perspective
+  // so the player cannot inspect the bot's unrevealed piece skills or private hand.
+  const displayedState = isVsBot
+    ? sanitizeForViewer(gameState, 1)
+    : isGodMode
+      ? gameState
+      : sanitizeForViewer(gameState, gameState.activePlayerId);
+
+  const viewerTeamId = isVsBot ? 1 : (activePlayer?.teamId ?? 1);
 
   const currentBoard: (Piece | MaskedPiece | null)[][] = intermediateBoard
-    ? isGodMode
+    ? isGodMode && !isVsBot
       ? intermediateBoard
       : intermediateBoard.map((row) =>
           row.map((piece) => {
             if (!piece) return null;
             if (piece.isRevealed) return piece;
-            if (piece.teamId === activePlayer?.teamId) return piece;
+            if (piece.teamId === viewerTeamId) return piece;
             return { ...piece, skillType: "NONE" };
           }),
         )
@@ -328,11 +345,10 @@ export default function App() {
     (player2?.hand.PURIFY ?? 0) +
     (player2?.hand.COUNTER ?? 0);
 
-  const availableMoves = getAvailableMoves(
-    gameState,
-    gameState.activePlayerId,
-    effectiveSkill,
-  );
+  // In vs Bot mode during bot's turn, do not show computer's possible legal moves
+  const availableMoves = isBotTurn
+    ? { standardMoves: [], pioneerMoves: [], isPioneerActive: false }
+    : getAvailableMoves(gameState, gameState.activePlayerId, effectiveSkill);
 
   const standardMoveSet = new Set(
     availableMoves.standardMoves.map(
@@ -345,248 +361,313 @@ export default function App() {
     ),
   );
 
-  const executeEventChoreography = async (
-    nextState: GameState,
-    events: GameEvent[],
-  ) => {
-    if (events.length === 0) {
-      setGameState(nextState);
-      setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev));
-      return;
+  // Hover preview: preview board state after capturing pieces (assuming standard pieces)
+  const previewCapturedSet = (() => {
+    if (!hoveredCoord || isAnimating || gameState.isGameOver || isBotTurn) {
+      return new Set<string>();
     }
 
-    setIsAnimating(true);
-    let currentIntermediateBoard: Board = gameState.board.map((row) =>
-      row.map((cell) => (cell ? { ...cell } : null)),
+    const key = `${hoveredCoord.x.toString()},${hoveredCoord.y.toString()}`;
+    if (!standardMoveSet.has(key)) {
+      return new Set<string>();
+    }
+
+    const raycasts = collectAllRaycasts(
+      currentBoard,
+      gameState.size,
+      hoveredCoord,
+      activePlayer?.teamId ?? 1,
+      "NONE",
     );
-    setIntermediateBoard(currentIntermediateBoard);
 
-    try {
-      await playEvents(events, {
-        onPiecePlaced: (pos, piece) => {
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) =>
-              rX === pos.x && rY === pos.y ? { ...piece } : cell,
-            ),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-          setPoppingCoord(pos);
-          setTimeout(() => {
-            setPoppingCoord(null);
-          }, 180);
-        },
-        onPioneerPlaced: (pos, piece) => {
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) =>
-              rX === pos.x && rY === pos.y ? { ...piece } : cell,
-            ),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-          setPoppingCoord(pos);
-          setTimeout(() => {
-            setPoppingCoord(null);
-          }, 180);
+    const set = new Set<string>();
+    for (const r of raycasts) {
+      for (const c of r.capturedCoords) {
+        set.add(`${c.x.toString()},${c.y.toString()}`);
+      }
+    }
+    return set;
+  })();
 
-          let closest: Coord | null = null;
-          let minDistance = Infinity;
-          for (let y = 0; y < gameState.size; y++) {
-            for (let x = 0; x < gameState.size; x++) {
-              if (x === pos.x && y === pos.y) continue;
-              const p = currentIntermediateBoard[y][x];
-              if (p?.teamId === piece.teamId) {
-                const d = Math.max(Math.abs(x - pos.x), Math.abs(y - pos.y));
-                if (d < minDistance) {
-                  minDistance = d;
-                  closest = { x, y };
+  const executeEventChoreography = useCallback(
+    async (nextState: GameState, events: GameEvent[]) => {
+      if (events.length === 0) {
+        setGameState(nextState);
+        setSelectedSkill((prev) =>
+          getNextSelectedSkill(nextState, prev, isVsBot),
+        );
+        return;
+      }
+
+      setIsAnimating(true);
+      let currentIntermediateBoard: Board = gameState.board.map((row) =>
+        row.map((cell) => (cell ? { ...cell } : null)),
+      );
+      setIntermediateBoard(currentIntermediateBoard);
+
+      try {
+        await playEvents(events, {
+          onPiecePlaced: (pos, piece) => {
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) =>
+                rX === pos.x && rY === pos.y ? { ...piece } : cell,
+              ),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+            setPoppingCoord(pos);
+            setTimeout(() => {
+              setPoppingCoord(null);
+            }, 180);
+          },
+          onPioneerPlaced: (pos, piece) => {
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) =>
+                rX === pos.x && rY === pos.y ? { ...piece } : cell,
+              ),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+            setPoppingCoord(pos);
+            setTimeout(() => {
+              setPoppingCoord(null);
+            }, 180);
+
+            let closest: Coord | null = null;
+            let minDistance = Infinity;
+            for (let y = 0; y < gameState.size; y++) {
+              for (let x = 0; x < gameState.size; x++) {
+                if (x === pos.x && y === pos.y) continue;
+                const p = currentIntermediateBoard[y][x];
+                if (p?.teamId === piece.teamId) {
+                  const d = Math.max(Math.abs(x - pos.x), Math.abs(y - pos.y));
+                  if (d < minDistance) {
+                    minDistance = d;
+                    closest = { x, y };
+                  }
                 }
               }
             }
-          }
-          if (closest) {
-            const bridgeId = `${Date.now().toString()}-${Math.random().toString()}`;
-            setPioneerBridges((prev) => [
+            if (closest) {
+              const bridgeId = `${Date.now().toString()}-${Math.random().toString()}`;
+              setPioneerBridges((prev) => [
+                ...prev,
+                { id: bridgeId, from: pos, to: closest },
+              ]);
+              setTimeout(() => {
+                setPioneerBridges((prev) =>
+                  prev.filter((b) => b.id !== bridgeId),
+                );
+              }, 800);
+            }
+          },
+          onPieceRevealed: (pos, skillType) => {
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) =>
+                rX === pos.x && rY === pos.y && cell
+                  ? { ...cell, skillType, isRevealed: true }
+                  : cell,
+              ),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+          },
+          onPieceFlip: (pos, toTeamId) => {
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) =>
+                rX === pos.x && rY === pos.y && cell
+                  ? {
+                      ...cell,
+                      teamId: toTeamId,
+                      skillType:
+                        cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                      duration: undefined,
+                      isRevealed: true,
+                    }
+                  : cell,
+              ),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+            const key = `${pos.x.toString()},${pos.y.toString()}`;
+            setFlippingCoords((prev) => new Set(prev).add(key));
+            setTimeout(() => {
+              setFlippingCoords((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+              });
+            }, 350);
+          },
+          onRaycastBlocked: (wallCoord) => {
+            const rippleId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setShieldRipples((prev) => [
               ...prev,
-              { id: bridgeId, from: pos, to: closest },
+              { id: rippleId, coord: wallCoord },
             ]);
             setTimeout(() => {
-              setPioneerBridges((prev) =>
-                prev.filter((b) => b.id !== bridgeId),
-              );
-            }, 800);
-          }
-        },
-        onPieceRevealed: (pos, skillType) => {
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) =>
-              rX === pos.x && rY === pos.y && cell
-                ? { ...cell, skillType, isRevealed: true }
-                : cell,
-            ),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-        },
-        onPieceFlip: (pos, toTeamId) => {
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) =>
-              rX === pos.x && rY === pos.y && cell
-                ? {
+              setShieldRipples((prev) => prev.filter((r) => r.id !== rippleId));
+            }, 500);
+          },
+          onCounterTriggered: (center, reversedCoords, defenderTeamId) => {
+            const reversedSet = new Set(
+              reversedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+            );
+            reversedSet.add(`${center.x.toString()},${center.y.toString()}`);
+
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) => {
+                if (
+                  reversedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                  cell
+                ) {
+                  if (cell.skillType === "PIERCE") {
+                    return { ...cell, isRevealed: true };
+                  }
+                  return {
                     ...cell,
-                    teamId: toTeamId,
+                    teamId: defenderTeamId,
                     skillType:
                       cell.skillType === "BOMB" ? cell.skillType : "NONE",
                     duration: undefined,
                     isRevealed: true,
+                  };
+                }
+                return cell;
+              }),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+          },
+          onBombTriggered: (center, blastCoords, teamId) => {
+            const blastSet = new Set(
+              blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+            );
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) => {
+                if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                  if (cell.skillType === "PIERCE") {
+                    return { ...cell, isRevealed: true };
                   }
-                : cell,
-            ),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-          const key = `${pos.x.toString()},${pos.y.toString()}`;
-          setFlippingCoords((prev) => new Set(prev).add(key));
-          setTimeout(() => {
-            setFlippingCoords((prev) => {
-              const next = new Set(prev);
-              next.delete(key);
-              return next;
+                  return {
+                    ...cell,
+                    teamId,
+                    skillType:
+                      cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                    duration: undefined,
+                    isRevealed: true,
+                  };
+                }
+                return cell;
+              }),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+
+            const blastId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setBlastWaves((prev) => [...prev, { id: blastId, center }]);
+            setTimeout(() => {
+              setBlastWaves((prev) => prev.filter((b) => b.id !== blastId));
+            }, 500);
+          },
+          onPurifyPulse: (center, affectedCoords, teamId) => {
+            const affectedSet = new Set(
+              affectedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+            );
+            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
+              row.map((cell, rX) => {
+                if (
+                  affectedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                  cell
+                ) {
+                  const nextSkill =
+                    cell.skillType === "BOMB" || cell.skillType === "COUNTER"
+                      ? "NONE"
+                      : cell.skillType;
+                  return {
+                    ...cell,
+                    teamId,
+                    skillType: nextSkill,
+                    isRevealed: true,
+                  };
+                }
+                return cell;
+              }),
+            );
+            setIntermediateBoard(currentIntermediateBoard);
+
+            const auraId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setAuraPulses((prev) => [...prev, { id: auraId, center }]);
+            setTimeout(() => {
+              setAuraPulses((prev) => prev.filter((a) => a.id !== auraId));
+            }, 600);
+          },
+          onAddFloatingText: (text, pos, variant) => {
+            const textId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setFloatingTexts((prev) => [
+              ...prev,
+              { id: textId, text, coord: pos, variant },
+            ]);
+            setTimeout(() => {
+              setFloatingTexts((prev) => prev.filter((t) => t.id !== textId));
+            }, 850);
+          },
+          onTriggerScreenShake: (durationMs = 200) => {
+            setIsScreenShaking(true);
+            setTimeout(() => {
+              setIsScreenShaking(false);
+            }, durationMs);
+          },
+          onTriggerScreenFlash: (color = "purple", durationMs = 250) => {
+            setScreenFlash(color);
+            setTimeout(() => {
+              setScreenFlash(null);
+            }, durationMs);
+          },
+        });
+
+        setGameState(nextState);
+        setEventLogs((prev) => [...events, ...prev]);
+        setSelectedSkill((prev) =>
+          getNextSelectedSkill(nextState, prev, isVsBot),
+        );
+      } finally {
+        setIsAnimating(false);
+        setIntermediateBoard(null);
+      }
+    },
+    [gameState.board, gameState.size, isVsBot],
+  );
+
+  // Bot opponent automated turn execution
+  useEffect(() => {
+    if (!isVsBot || gameState.isGameOver || isAnimating) return;
+
+    if (gameState.activePlayerId === 2) {
+      const timer = setTimeout(() => {
+        try {
+          const action = selectBestMove(gameState, 2, "MEDIUM");
+          const { nextState, events } = dispatch(gameState, action);
+          void executeEventChoreography(nextState, events);
+        } catch (err) {
+          if (err instanceof Error) {
+            handleShowToast(formatErrorMessage(err.message), "error");
+          }
+          // Failsafe: pass turn if bot action encounters an error to prevent game stall
+          try {
+            const { nextState, events } = dispatch(gameState, {
+              type: "PASS_TURN",
+              playerId: 2,
             });
-          }, 350);
-        },
-        onRaycastBlocked: (wallCoord) => {
-          const rippleId = `${Date.now().toString()}-${Math.random().toString()}`;
-          setShieldRipples((prev) => [
-            ...prev,
-            { id: rippleId, coord: wallCoord },
-          ]);
-          setTimeout(() => {
-            setShieldRipples((prev) => prev.filter((r) => r.id !== rippleId));
-          }, 500);
-        },
-        onCounterTriggered: (center, reversedCoords, defenderTeamId) => {
-          const reversedSet = new Set(
-            reversedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
-          );
-          reversedSet.add(`${center.x.toString()},${center.y.toString()}`);
+            void executeEventChoreography(nextState, events);
+          } catch {
+            // If pass also fails, state remains
+          }
+        }
+      }, 400);
 
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) => {
-              if (
-                reversedSet.has(`${rX.toString()},${rY.toString()}`) &&
-                cell
-              ) {
-                if (cell.skillType === "PIERCE") {
-                  return { ...cell, isRevealed: true };
-                }
-                return {
-                  ...cell,
-                  teamId: defenderTeamId,
-                  skillType:
-                    cell.skillType === "BOMB" ? cell.skillType : "NONE",
-                  duration: undefined,
-                  isRevealed: true,
-                };
-              }
-              return cell;
-            }),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-        },
-        onBombTriggered: (center, blastCoords, teamId) => {
-          const blastSet = new Set(
-            blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
-          );
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) => {
-              if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
-                if (cell.skillType === "PIERCE") {
-                  return { ...cell, isRevealed: true };
-                }
-                return {
-                  ...cell,
-                  teamId,
-                  skillType:
-                    cell.skillType === "BOMB" ? cell.skillType : "NONE",
-                  duration: undefined,
-                  isRevealed: true,
-                };
-              }
-              return cell;
-            }),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-
-          const blastId = `${Date.now().toString()}-${Math.random().toString()}`;
-          setBlastWaves((prev) => [...prev, { id: blastId, center }]);
-          setTimeout(() => {
-            setBlastWaves((prev) => prev.filter((b) => b.id !== blastId));
-          }, 500);
-        },
-        onPurifyPulse: (center, affectedCoords, teamId) => {
-          const affectedSet = new Set(
-            affectedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
-          );
-          currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-            row.map((cell, rX) => {
-              if (
-                affectedSet.has(`${rX.toString()},${rY.toString()}`) &&
-                cell
-              ) {
-                const nextSkill =
-                  cell.skillType === "BOMB" || cell.skillType === "COUNTER"
-                    ? "NONE"
-                    : cell.skillType;
-                return {
-                  ...cell,
-                  teamId,
-                  skillType: nextSkill,
-                  isRevealed: true,
-                };
-              }
-              return cell;
-            }),
-          );
-          setIntermediateBoard(currentIntermediateBoard);
-
-          const auraId = `${Date.now().toString()}-${Math.random().toString()}`;
-          setAuraPulses((prev) => [...prev, { id: auraId, center }]);
-          setTimeout(() => {
-            setAuraPulses((prev) => prev.filter((a) => a.id !== auraId));
-          }, 600);
-        },
-        onAddFloatingText: (text, pos, variant) => {
-          const textId = `${Date.now().toString()}-${Math.random().toString()}`;
-          setFloatingTexts((prev) => [
-            ...prev,
-            { id: textId, text, coord: pos, variant },
-          ]);
-          setTimeout(() => {
-            setFloatingTexts((prev) => prev.filter((t) => t.id !== textId));
-          }, 850);
-        },
-        onTriggerScreenShake: (durationMs = 200) => {
-          setIsScreenShaking(true);
-          setTimeout(() => {
-            setIsScreenShaking(false);
-          }, durationMs);
-        },
-        onTriggerScreenFlash: (color = "purple", durationMs = 250) => {
-          setScreenFlash(color);
-          setTimeout(() => {
-            setScreenFlash(null);
-          }, durationMs);
-        },
-      });
-
-      setGameState(nextState);
-      setEventLogs((prev) => [...events, ...prev]);
-      setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev));
-    } finally {
-      setIsAnimating(false);
-      setIntermediateBoard(null);
+      return () => {
+        clearTimeout(timer);
+      };
     }
-  };
+  }, [isVsBot, gameState, isAnimating, executeEventChoreography]);
 
   const handleCellClick = (coord: Coord) => {
-    if (isAnimating) return;
+    if (isAnimating || (isVsBot && gameState.activePlayerId === 2)) return;
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PLACE_PIECE",
@@ -603,7 +684,7 @@ export default function App() {
   };
 
   const handlePassTurn = () => {
-    if (isAnimating) return;
+    if (isAnimating || (isVsBot && gameState.activePlayerId === 2)) return;
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PASS_TURN",
@@ -706,6 +787,20 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
+              setIsVsBot(!isVsBot);
+            }}
+            disabled={isAnimating}
+            className={`cursor-pointer rounded px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              isVsBot
+                ? "border border-rose-500/50 bg-rose-950/50 text-rose-200 hover:bg-rose-900/60"
+                : "border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700"
+            }`}
+          >
+            {isVsBot ? "🤖 模式：對戰電腦" : "👥 模式：同機雙人"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               const nextMuted = toggleAudioMuted();
               setIsMuted(nextMuted);
             }}
@@ -720,16 +815,25 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
-              setIsGodMode(!isGodMode);
+              if (!isVsBot) {
+                setIsGodMode(!isGodMode);
+              }
             }}
-            disabled={isAnimating}
+            disabled={isAnimating || isVsBot}
+            title={isVsBot ? "對戰電腦時強制維持玩家視角" : undefined}
             className={`cursor-pointer rounded px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              isGodMode
-                ? "bg-purple-700 text-white hover:bg-purple-600"
-                : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              isVsBot
+                ? "border border-slate-700 bg-slate-800 text-slate-400"
+                : isGodMode
+                  ? "bg-purple-700 text-white hover:bg-purple-600"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
             }`}
           >
-            {isGodMode ? "上帝視角（全揭示）" : "戰爭迷霧（玩家視角）"}
+            {isVsBot
+              ? "戰爭迷霧（玩家視角）"
+              : isGodMode
+                ? "上帝視角（全揭示）"
+                : "戰爭迷霧（玩家視角）"}
           </button>
           <button
             type="button"
@@ -806,6 +910,19 @@ export default function App() {
                   正在執行事件序列與戰鬥動畫
                 </span>
               </div>
+            ) : isVsBot && gameState.activePlayerId === 2 ? (
+              <div className="flex items-center gap-2 text-rose-300">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+                </span>
+                <span className="font-bold tracking-wider">
+                  AI 電腦思考中...
+                </span>
+                <span className="text-slate-400">
+                  正在評估最佳落子戰略與連鎖效應
+                </span>
+              </div>
             ) : availableMoves.isPioneerActive ? (
               <div className="flex items-center gap-2 text-amber-300">
                 <span className="relative flex h-2.5 w-2.5">
@@ -845,6 +962,10 @@ export default function App() {
                 <span className="rounded bg-purple-900/60 px-2 py-0.5 font-mono text-[11px] font-bold text-purple-300 ring-1 ring-purple-500/40">
                   操作鎖定
                 </span>
+              ) : isVsBot && gameState.activePlayerId === 2 ? (
+                <span className="rounded border border-rose-500/40 bg-rose-950/60 px-2 py-0.5 font-mono text-[11px] font-bold text-rose-300 ring-1 ring-rose-500/40">
+                  電腦回合
+                </span>
               ) : availableMoves.isPioneerActive ? (
                 <span className="rounded bg-amber-900/60 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-300 ring-1 ring-amber-500/40">
                   {availableMoves.pioneerMoves.length.toString()} 個拓荒目標點
@@ -854,13 +975,20 @@ export default function App() {
                   <span className="rounded bg-amber-900/60 px-2 py-0.5 text-amber-300">
                     剩餘 {gameState.dropTurnsRemaining.toString()} 回合
                   </span>
-                  {activePlayer?.dropZone && (
-                    <span className="hidden rounded bg-slate-800 px-2 py-0.5 text-slate-300 sm:inline">
-                      中心 ({activePlayer.dropZone.center.x.toString()},{" "}
-                      {activePlayer.dropZone.center.y.toString()}) 半徑=
-                      {activePlayer.dropZone.radius.toString()}
-                    </span>
-                  )}
+                  {(() => {
+                    const dropZoneToShow = isVsBot
+                      ? gameState.players.find((p) => p.teamId === 1)?.dropZone
+                      : activePlayer?.dropZone;
+                    return (
+                      dropZoneToShow && (
+                        <span className="hidden rounded bg-slate-800 px-2 py-0.5 text-slate-300 sm:inline">
+                          中心 ({dropZoneToShow.center.x.toString()},{" "}
+                          {dropZoneToShow.center.y.toString()}) 半徑=
+                          {dropZoneToShow.radius.toString()}
+                        </span>
+                      )
+                    );
+                  })()}
                 </div>
               ) : (
                 <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-emerald-400">
@@ -893,6 +1021,9 @@ export default function App() {
               style={{
                 gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
               }}
+              onMouseLeave={() => {
+                setHoveredCoord(null);
+              }}
             >
               {currentBoard.map((row, y) =>
                 row.map((piece, x) => {
@@ -900,24 +1031,49 @@ export default function App() {
                   const isStandardLegal = standardMoveSet.has(key);
                   const isPioneerLegal = pioneerMoveSet.has(key);
                   const isLegal = isStandardLegal || isPioneerLegal;
+                  const effectiveDropZone = isVsBot
+                    ? gameState.players.find((p) => p.teamId === 1)?.dropZone
+                    : activePlayer?.dropZone;
                   const inDropZone =
                     gameState.isDropPhase &&
-                    activePlayer?.dropZone &&
-                    isWithinDropZone({ x, y }, activePlayer.dropZone);
+                    effectiveDropZone &&
+                    isWithinDropZone({ x, y }, effectiveDropZone);
                   const isFlipping = flippingCoords.has(key);
                   const isPopping =
                     poppingCoord?.x === x && poppingCoord.y === y;
+
+                  const isHovered =
+                    hoveredCoord?.x === x && hoveredCoord.y === y;
+                  const isPreviewPlacement =
+                    !isAnimating &&
+                    piece === null &&
+                    isHovered &&
+                    isStandardLegal;
+                  const isPreviewFlipped =
+                    !isAnimating && previewCapturedSet.has(key);
 
                   return (
                     <button
                       key={key}
                       type="button"
+                      onMouseEnter={() => {
+                        if (!isAnimating && !isBotTurn && isStandardLegal) {
+                          setHoveredCoord({ x, y });
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (hoveredCoord?.x === x && hoveredCoord.y === y) {
+                          setHoveredCoord(null);
+                        }
+                      }}
                       onClick={() => {
+                        setHoveredCoord(null);
                         handleCellClick({ x, y });
                       }}
                       disabled={
                         isAnimating ||
                         gameState.isGameOver ||
+                        (isVsBot && gameState.activePlayerId === 2) ||
                         (piece !== null && !isLegal)
                       }
                       className={`relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
@@ -927,7 +1083,7 @@ export default function App() {
                       } ${
                         gameState.isDropPhase
                           ? inDropZone
-                            ? activePlayer.teamId === 1
+                            ? (isVsBot ? 1 : (activePlayer?.teamId ?? 1)) === 1
                               ? "bg-sky-950/30 ring-1 ring-sky-400/50 ring-inset"
                               : "bg-rose-950/30 ring-1 ring-rose-400/50 ring-inset"
                             : "opacity-40"
@@ -942,15 +1098,18 @@ export default function App() {
                             : "hover:bg-slate-700/50"
                       }`}
                     >
-                      {/* Legal Move Marker matching active team color */}
-                      {piece === null && !isAnimating && isStandardLegal && (
-                        <span
-                          className={getLegalMarkerClass(
-                            activePlayer?.teamId ?? 1,
-                            false,
-                          )}
-                        />
-                      )}
+                      {/* Legal Move Marker matching active team color (hidden during preview ghost piece) */}
+                      {piece === null &&
+                        !isAnimating &&
+                        isStandardLegal &&
+                        !isPreviewPlacement && (
+                          <span
+                            className={getLegalMarkerClass(
+                              activePlayer?.teamId ?? 1,
+                              false,
+                            )}
+                          />
+                        )}
                       {piece === null && !isAnimating && isPioneerLegal && (
                         <span
                           className={getLegalMarkerClass(
@@ -960,20 +1119,46 @@ export default function App() {
                         />
                       )}
 
-                      {/* Piece Representation */}
+                      {/* Hover Preview Ghost Piece */}
+                      {isPreviewPlacement && (
+                        <div
+                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border border-dashed shadow-xs transition-all sm:h-6 sm:w-6 md:h-7 md:w-7 ${
+                            activePlayer?.teamId === 1
+                              ? "border-sky-300/80 bg-sky-400/40 text-slate-950 ring-2 ring-sky-300/70"
+                              : "border-rose-300/80 bg-rose-500/40 text-white ring-2 ring-rose-300/70"
+                          }`}
+                        >
+                          <span className="text-[9px] font-black opacity-90 sm:text-[10px]">
+                            +
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Piece Representation (including Preview Flipped State) */}
                       {piece && (
                         <div
-                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${getTeamColorClass(
-                            piece.teamId,
-                          )} ${
-                            !piece.isRevealed
+                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${
+                            isPreviewFlipped
+                              ? `${getTeamColorClass(
+                                  activePlayer?.teamId ?? 1,
+                                )} scale-95 shadow-md ring-2 ring-amber-300`
+                              : getTeamColorClass(piece.teamId)
+                          } ${
+                            !piece.isRevealed &&
+                            !isPreviewFlipped &&
+                            piece.teamId === viewerTeamId
                               ? "border-dashed ring-1 ring-slate-400/50"
+                              : ""
+                          } ${
+                            piece.skillType === "PURIFY" &&
+                            piece.duration !== undefined
+                              ? "shadow-xs ring-1 shadow-amber-500/30 ring-amber-400/80"
                               : ""
                           } ${isFlipping ? "animate-piece-flip" : ""} ${
                             isPopping ? "animate-piece-pop" : ""
                           }`}
                         >
-                          {piece.teamId === 0 ? (
+                          {isPreviewFlipped ? null : piece.teamId === 0 ? (
                             <span className="text-[10px] sm:text-xs">⚓</span>
                           ) : SKILL_CONFIG[piece.skillType].code ? (
                             <span
@@ -984,6 +1169,18 @@ export default function App() {
                               {SKILL_CONFIG[piece.skillType].code}
                             </span>
                           ) : null}
+
+                          {/* Revealed PURIFY Remaining Duration Marker */}
+                          {!isPreviewFlipped &&
+                            piece.skillType === "PURIFY" &&
+                            piece.duration !== undefined && (
+                              <span
+                                title={`救贖之光：淨化光環生效中（剩餘 ${piece.duration.toString()} 回合）`}
+                                className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-amber-300 bg-amber-400 text-[8px] font-black text-slate-950 shadow-md ring-1 ring-slate-950 sm:h-4 sm:w-4 sm:text-[9px]"
+                              >
+                                {piece.duration.toString()}
+                              </span>
+                            )}
                         </div>
                       )}
                     </button>
@@ -1028,7 +1225,11 @@ export default function App() {
               <button
                 type="button"
                 onClick={handlePassTurn}
-                disabled={isAnimating || gameState.isGameOver}
+                disabled={
+                  isAnimating ||
+                  gameState.isGameOver ||
+                  (isVsBot && gameState.activePlayerId === 2)
+                }
                 className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 跳過回合
@@ -1050,16 +1251,24 @@ export default function App() {
               </span>
             </div>
 
-            {activePlayer?.dropZone && gameState.isDropPhase && (
-              <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-                <span>當前空降區：</span>
-                <span className="font-mono text-slate-300">
-                  中心 ({activePlayer.dropZone.center.x.toString()},{" "}
-                  {activePlayer.dropZone.center.y.toString()})，半徑=
-                  {activePlayer.dropZone.radius.toString()}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const dropZoneToShow = isVsBot
+                ? gameState.players.find((p) => p.teamId === 1)?.dropZone
+                : activePlayer?.dropZone;
+              return (
+                dropZoneToShow &&
+                gameState.isDropPhase && (
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>當前空降區：</span>
+                    <span className="font-mono text-slate-300">
+                      中心 ({dropZoneToShow.center.x.toString()},{" "}
+                      {dropZoneToShow.center.y.toString()})，半徑=
+                      {dropZoneToShow.radius.toString()}
+                    </span>
+                  </div>
+                )
+              );
+            })()}
 
             <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2 text-xs text-slate-400">
               <span className="font-semibold text-slate-300">
@@ -1115,8 +1324,8 @@ export default function App() {
                         ⚡ 強制特技
                       </span>
                     )}
-                    <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
-                      特技: {player1SpecialsCount.toString()} 枚
+                    <span className="rounded-md border border-purple-400/60 bg-purple-950/80 px-2.5 py-0.5 text-[11px] font-black text-purple-200 shadow-sm ring-1 ring-purple-500/40">
+                      特技總庫存: {player1SpecialsCount.toString()} 枚
                     </span>
                     <span className="rounded-md border border-sky-400/40 bg-sky-950/60 px-2 py-0.5 text-[11px] font-black text-sky-200 shadow-xs">
                       盤面: {team1Count.toString()} 顆
@@ -1178,98 +1387,152 @@ export default function App() {
                             : isForbidden
                               ? "強制特技生效中，禁止放置常規棋"
                               : isOutOfStock
-                                ? "無庫存可用（冷卻中）"
-                                : `選擇 ${config.label}`
+                                ? `無庫存可用（下枚充能中：${charge.toString()}/${cd.toString()} 回合）`
+                                : `選擇 ${config.label}（庫存剩餘 ${count.toString()} 枚）`
                         }
-                        className={`relative flex flex-col gap-1.5 rounded-lg border p-2.5 text-left text-xs transition-all ${
+                        className={`group relative flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
                           isSelected
-                            ? "border-sky-400 bg-slate-800 text-white shadow-md ring-2 ring-sky-500/50"
+                            ? "border-sky-400 bg-sky-950/40 text-white shadow-lg ring-2 shadow-sky-950/40 ring-sky-400/80"
                             : isDisabled
-                              ? "cursor-not-allowed border-slate-800/60 bg-slate-900/30 text-slate-500 opacity-40"
-                              : `${config.buttonStyle} cursor-pointer opacity-85 hover:opacity-100`
+                              ? "cursor-not-allowed border-slate-800/60 bg-slate-900/20 text-slate-500 opacity-45"
+                              : count > 0 && !isNone
+                                ? count >= maxHand
+                                  ? "hover:bg-slate-850 cursor-pointer border-amber-500/50 bg-slate-900/90 text-slate-100 shadow-xs hover:border-amber-400"
+                                  : "hover:bg-slate-850 cursor-pointer border-sky-500/40 bg-slate-900/90 text-slate-100 shadow-xs hover:border-sky-400"
+                                : `${config.buttonStyle} cursor-pointer opacity-85 hover:opacity-100`
                         }`}
                       >
-                        <div className="flex w-full items-center justify-between gap-1">
+                        {/* Primary Header: Piece Info & Hero Stock */}
+                        <div className="flex w-full items-start justify-between gap-1.5">
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-sky-300/80 bg-sky-400 shadow-xs">
+                            <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-300/80 bg-sky-400 shadow-xs">
                               {config.code ? (
                                 <span
-                                  className={`flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-black ${config.annotationStyle}`}
+                                  className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-black ${config.annotationStyle}`}
                                 >
                                   {config.code}
                                 </span>
                               ) : null}
                             </span>
-                            <span className="truncate text-[11px] font-bold">
-                              {opt.label.split(" ")[0]}
-                            </span>
-                          </div>
-
-                          {/* Prominent Stock Badge */}
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-black tracking-tight ${
-                              isNone
-                                ? "border border-slate-700 bg-slate-800 text-slate-300"
-                                : count >= maxHand
-                                  ? "border border-amber-400/80 bg-amber-500/30 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
-                                  : count > 0
-                                    ? "border border-emerald-400/80 bg-emerald-500/30 text-emerald-100 shadow-xs ring-1 ring-emerald-400/40"
-                                    : "border border-rose-900/60 bg-rose-950/60 text-rose-400/90"
-                            }`}
-                          >
-                            {isNone
-                              ? "∞ 無限"
-                              : count >= maxHand
-                                ? `庫存 ${count.toString()}/${maxHand.toString()}（滿）`
-                                : count > 0
-                                  ? `庫存 ${count.toString()}/${maxHand.toString()}`
-                                  : `0/${maxHand.toString()}（無庫存）`}
-                          </span>
-                        </div>
-
-                        {!isNone && (
-                          <div className="w-full">
-                            <div className="mb-0.5 flex items-center justify-between text-[10px]">
-                              <span className="text-slate-400">冷卻進度</span>
-                              <span className="font-mono font-bold text-slate-200">
-                                {charge.toString()}/{cd.toString()} 回合
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-xs leading-tight font-bold">
+                                {opt.label.split(" ")[0]}
+                              </span>
+                              <span className="text-[10px] leading-tight text-slate-400">
+                                {isNone
+                                  ? "常規棋"
+                                  : (config.label.split(" ")[1] ?? "")}
                               </span>
                             </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-                              <div
-                                className={`h-full transition-all duration-300 ${
-                                  count >= maxHand
-                                    ? "bg-amber-400"
-                                    : charge >= cd - 1
-                                      ? "bg-sky-400"
-                                      : "bg-blue-600"
-                                }`}
-                                style={{
-                                  width: `${Math.min(100, Math.round((charge / cd) * 100)).toString()}%`,
-                                }}
-                              />
-                            </div>
                           </div>
-                        )}
 
-                        {isForbidden && (
-                          <span className="text-[10px] font-bold text-red-400">
-                            🚫 禁下常規棋
-                          </span>
-                        )}
-                        {!isNone &&
-                          isOutOfStock &&
-                          !isForbidden &&
-                          isActive && (
-                            <span className="text-[10px] font-semibold text-rose-400">
-                              ❌ 無庫存（冷卻中）
+                          {/* Hero Stock Display & Visual Pips */}
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            {isNone ? (
+                              <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-300">
+                                ∞ 無限
+                              </span>
+                            ) : (
+                              <div
+                                className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black tracking-tight ${
+                                  count >= maxHand
+                                    ? "animate-pulse border border-amber-400 bg-amber-500/25 text-amber-200 shadow-xs ring-1 ring-amber-400/60"
+                                    : count > 0
+                                      ? "border border-emerald-400/90 bg-emerald-500/25 text-emerald-100 shadow-xs ring-1 ring-emerald-400/50"
+                                      : "border border-slate-800 bg-slate-900/80 text-slate-500"
+                                }`}
+                              >
+                                <span className="text-xs">
+                                  {count > 0 ? `x${count.toString()}` : "0"}
+                                </span>
+                                <span className="text-[10px] font-normal opacity-75">
+                                  / {maxHand.toString()}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Visual Stock Pips (庫存點數槽) */}
+                            {!isNone && (
+                              <div
+                                className="flex items-center gap-1"
+                                title={`可用庫存：${count.toString()}/${maxHand.toString()} 枚`}
+                              >
+                                {Array.from({ length: maxHand }).map(
+                                  (_, idx) => {
+                                    const isFilled = idx < count;
+                                    return (
+                                      <span
+                                        key={idx}
+                                        className={`inline-block h-2 w-2 rounded-full transition-all ${
+                                          isFilled
+                                            ? count >= maxHand
+                                              ? "bg-amber-400 shadow-xs ring-1 shadow-amber-400 ring-amber-300"
+                                              : "bg-emerald-400 shadow-xs ring-1 shadow-emerald-400 ring-emerald-300"
+                                            : "border border-slate-700 bg-slate-800/80"
+                                        }`}
+                                      />
+                                    );
+                                  },
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Secondary Helper Section: Cooldown & Status */}
+                        <div className="mt-2 w-full border-t border-slate-800/80 pt-1.5">
+                          {isForbidden ? (
+                            <span className="text-[10px] font-bold text-rose-400">
+                              🚫 強制特技：禁止落常規棋
                             </span>
+                          ) : isNone ? (
+                            <span className="text-[10px] text-slate-400">
+                              隨時可用・無冷卻限制
+                            </span>
+                          ) : count >= maxHand ? (
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-amber-300">
+                                ⚡ 滿額就緒（隨時部署）
+                              </span>
+                              <span className="font-mono text-[9px] text-amber-400/90">
+                                MAX
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span
+                                  className={
+                                    count === 0
+                                      ? "font-medium text-amber-400/90"
+                                      : "text-slate-400"
+                                  }
+                                >
+                                  {count === 0 ? "⏳ 補給充能中" : "下枚補給"}
+                                </span>
+                                <span className="font-mono font-bold text-slate-300">
+                                  {charge.toString()}/{cd.toString()} 回合
+                                </span>
+                              </div>
+                              <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+                                <div
+                                  className={`h-full transition-all duration-300 ${
+                                    count === 0
+                                      ? charge >= cd - 1
+                                        ? "bg-amber-400"
+                                        : "bg-amber-600/80"
+                                      : charge >= cd - 1
+                                        ? "bg-sky-400"
+                                        : "bg-sky-600/70"
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(100, Math.round((charge / cd) * 100)).toString()}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
                           )}
-                        {!isNone && count > 0 && !isForbidden && isActive && (
-                          <span className="text-[10px] font-semibold text-emerald-400">
-                            ✔ 可部署
-                          </span>
-                        )}
+                        </div>
                       </button>
                     );
                   })}
@@ -1293,11 +1556,11 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded-full border border-rose-300/80 bg-rose-500" />
                     <span className="text-xs font-bold text-slate-200">
-                      第二隊（緋紅）
+                      第二隊（緋紅）{isVsBot ? " (AI 電腦)" : ""}
                     </span>
                     {isActive ? (
                       <span className="animate-pulse rounded border border-rose-500/40 bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                        行動中
+                        {isVsBot ? "思考中" : "行動中"}
                       </span>
                     ) : (
                       <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
@@ -1307,13 +1570,16 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {player2?.isForcedSpecial && (
+                    {!isVsBot && player2?.isForcedSpecial && (
                       <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
                         ⚡ 強制特技
                       </span>
                     )}
                     <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
-                      特技: {player2SpecialsCount.toString()} 枚
+                      特技:{" "}
+                      {isVsBot
+                        ? "迷霧隱藏"
+                        : `${player2SpecialsCount.toString()} 枚`}
                     </span>
                     <span className="rounded-md border border-rose-400/40 bg-rose-950/60 px-2 py-0.5 text-[11px] font-black text-rose-200 shadow-xs">
                       盤面: {team2Count.toString()} 顆
@@ -1321,156 +1587,251 @@ export default function App() {
                   </div>
                 </div>
 
-                {player2?.isForcedSpecial && isActive && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/70 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 shadow-md">
-                    <span className="text-base">⚡</span>
-                    <div className="flex flex-col">
-                      <span className="font-bold tracking-wide text-amber-300">
-                        強制特技施放階段 (Forced Special)
+                {isVsBot ? (
+                  <div className="flex flex-col gap-2.5 rounded-lg border border-slate-800/80 bg-slate-900/40 p-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🤖</span>
+                        <span className="font-bold text-slate-200">
+                          AI 電腦決策核心
+                        </span>
+                      </div>
+                      <span
+                        className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                          isActive
+                            ? "animate-pulse border border-rose-500/50 bg-rose-500/20 text-rose-300"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {isActive ? "即時運算中" : "待命狀態"}
                       </span>
-                      <span className="text-[11px] text-amber-200/90">
-                        特技庫存已達上限且充能完畢！已自動選取優先度最高之特技（
-                        {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
-                        ），本回合必須放置特殊棋。
+                    </div>
+
+                    <p className="text-[11px] leading-relaxed text-slate-400">
+                      單人對戰模式：電腦戰略佈局與特技手牌均受戰爭迷霧嚴格保護，不公開顯示。
+                    </p>
+
+                    <div className="flex items-center justify-between border-t border-slate-800/60 pt-2 text-[10px] text-slate-400">
+                      <span>戰術策略：全域啟發式權重評估</span>
+                      <span className="font-mono font-bold text-rose-300">
+                        MEDIUM
                       </span>
                     </div>
                   </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2">
-                  {SKILL_OPTIONS.map((opt) => {
-                    const isNone = opt.type === "NONE";
-                    const spec =
-                      opt.type !== "NONE" ? SKILL_SPECS[opt.type] : null;
-                    const count = isNone
-                      ? Infinity
-                      : (player2?.hand[opt.type] ?? 0);
-                    const maxHand = spec?.maxHand ?? Infinity;
-                    const charge = isNone
-                      ? 0
-                      : (player2?.charge[opt.type] ?? 0);
-                    const cd = spec?.cd ?? 0;
-
-                    const isOutOfStock = !isNone && count <= 0;
-                    const isForbidden =
-                      isNone && (player2?.isForcedSpecial ?? false);
-                    const isDisabled =
-                      isAnimating || !isActive || isOutOfStock || isForbidden;
-                    const isSelected = isActive && effectiveSkill === opt.type;
-                    const config = SKILL_CONFIG[opt.type];
-
-                    return (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => {
-                          if (isActive && !isDisabled) {
-                            setSelectedSkill(opt.type);
-                          }
-                        }}
-                        title={
-                          !isActive
-                            ? "等待第二隊（緋紅）回合"
-                            : isForbidden
-                              ? "強制特技生效中，禁止放置常規棋"
-                              : isOutOfStock
-                                ? "無庫存可用（冷卻中）"
-                                : `選擇 ${config.label}`
-                        }
-                        className={`relative flex flex-col gap-1.5 rounded-lg border p-2.5 text-left text-xs transition-all ${
-                          isSelected
-                            ? "border-rose-400 bg-slate-800 text-white shadow-md ring-2 ring-rose-500/50"
-                            : isDisabled
-                              ? "cursor-not-allowed border-slate-800/60 bg-slate-900/30 text-slate-500 opacity-40"
-                              : `${config.buttonStyle} cursor-pointer opacity-85 hover:opacity-100`
-                        }`}
-                      >
-                        <div className="flex w-full items-center justify-between gap-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-rose-300/80 bg-rose-500 shadow-xs">
-                              {config.code ? (
-                                <span
-                                  className={`flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-black ${config.annotationStyle}`}
-                                >
-                                  {config.code}
-                                </span>
-                              ) : null}
-                            </span>
-                            <span className="truncate text-[11px] font-bold">
-                              {opt.label.split(" ")[0]}
-                            </span>
-                          </div>
-
-                          {/* Prominent Stock Badge */}
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-black tracking-tight ${
-                              isNone
-                                ? "border border-slate-700 bg-slate-800 text-slate-300"
-                                : count >= maxHand
-                                  ? "border border-amber-400/80 bg-amber-500/30 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
-                                  : count > 0
-                                    ? "border border-emerald-400/80 bg-emerald-500/30 text-emerald-100 shadow-xs ring-1 ring-emerald-400/40"
-                                    : "border border-rose-900/60 bg-rose-950/60 text-rose-400/90"
-                            }`}
-                          >
-                            {isNone
-                              ? "∞ 無限"
-                              : count >= maxHand
-                                ? `庫存 ${count.toString()}/${maxHand.toString()}（滿）`
-                                : count > 0
-                                  ? `庫存 ${count.toString()}/${maxHand.toString()}`
-                                  : `0/${maxHand.toString()}（無庫存）`}
+                ) : (
+                  <>
+                    {player2?.isForcedSpecial && isActive && (
+                      <div className="flex items-center gap-2 rounded-lg border border-amber-500/70 bg-amber-950/70 px-3 py-2 text-xs text-amber-200 shadow-md">
+                        <span className="text-base">⚡</span>
+                        <div className="flex flex-col">
+                          <span className="font-bold tracking-wide text-amber-300">
+                            強制特技施放階段 (Forced Special)
+                          </span>
+                          <span className="text-[11px] text-amber-200/90">
+                            特技庫存已達上限且充能完畢！已自動選取優先度最高之特技（
+                            {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
+                            ），本回合必須放置特殊棋。
                           </span>
                         </div>
+                      </div>
+                    )}
 
-                        {!isNone && (
-                          <div className="w-full">
-                            <div className="mb-0.5 flex items-center justify-between text-[10px]">
-                              <span className="text-slate-400">冷卻進度</span>
-                              <span className="font-mono font-bold text-slate-200">
-                                {charge.toString()}/{cd.toString()} 回合
-                              </span>
-                            </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-                              <div
-                                className={`h-full transition-all duration-300 ${
-                                  count >= maxHand
-                                    ? "bg-amber-400"
-                                    : charge >= cd - 1
-                                      ? "bg-sky-400"
-                                      : "bg-blue-600"
-                                }`}
-                                style={{
-                                  width: `${Math.min(100, Math.round((charge / cd) * 100)).toString()}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
+                    <div className="grid grid-cols-2 gap-2">
+                      {SKILL_OPTIONS.map((opt) => {
+                        const isNone = opt.type === "NONE";
+                        const spec =
+                          opt.type !== "NONE" ? SKILL_SPECS[opt.type] : null;
+                        const count = isNone
+                          ? Infinity
+                          : (player2?.hand[opt.type] ?? 0);
+                        const maxHand = spec?.maxHand ?? Infinity;
+                        const charge = isNone
+                          ? 0
+                          : (player2?.charge[opt.type] ?? 0);
+                        const cd = spec?.cd ?? 0;
 
-                        {isForbidden && (
-                          <span className="text-[10px] font-bold text-red-400">
-                            🚫 禁下常規棋
-                          </span>
-                        )}
-                        {!isNone &&
-                          isOutOfStock &&
-                          !isForbidden &&
-                          isActive && (
-                            <span className="text-[10px] font-semibold text-rose-400">
-                              ❌ 無庫存（冷卻中）
-                            </span>
-                          )}
-                        {!isNone && count > 0 && !isForbidden && isActive && (
-                          <span className="text-[10px] font-semibold text-emerald-400">
-                            ✔ 可部署
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                        const isOutOfStock = !isNone && count <= 0;
+                        const isForbidden =
+                          isNone && (player2?.isForcedSpecial ?? false);
+                        const isDisabled =
+                          isAnimating ||
+                          !isActive ||
+                          isOutOfStock ||
+                          isForbidden;
+                        const isSelected =
+                          isActive && effectiveSkill === opt.type;
+                        const config = SKILL_CONFIG[opt.type];
+
+                        return (
+                          <button
+                            key={opt.type}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              if (isActive && !isDisabled) {
+                                setSelectedSkill(opt.type);
+                              }
+                            }}
+                            title={
+                              !isActive
+                                ? "等待第二隊（緋紅）回合"
+                                : isForbidden
+                                  ? "強制特技生效中，禁止放置常規棋"
+                                  : isOutOfStock
+                                    ? `無庫存可用（下枚充能中：${charge.toString()}/${cd.toString()} 回合）`
+                                    : `選擇 ${config.label}（庫存剩餘 ${count.toString()} 枚）`
+                            }
+                            className={`group relative flex flex-col justify-between rounded-lg border p-2.5 text-left transition-all ${
+                              isSelected
+                                ? "border-rose-400 bg-rose-950/40 text-white shadow-lg ring-2 shadow-rose-950/40 ring-rose-400/80"
+                                : isDisabled
+                                  ? "cursor-not-allowed border-slate-800/60 bg-slate-900/20 text-slate-500 opacity-45"
+                                  : count > 0 && !isNone
+                                    ? count >= maxHand
+                                      ? "hover:bg-slate-850 cursor-pointer border-amber-500/50 bg-slate-900/90 text-slate-100 shadow-xs hover:border-amber-400"
+                                      : "hover:bg-slate-850 cursor-pointer border-rose-500/40 bg-slate-900/90 text-slate-100 shadow-xs hover:border-rose-400"
+                                    : `${config.buttonStyle} cursor-pointer opacity-85 hover:opacity-100`
+                            }`}
+                          >
+                            {/* Primary Header: Piece Info & Hero Stock */}
+                            <div className="flex w-full items-start justify-between gap-1.5">
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-rose-300/80 bg-rose-500 shadow-xs">
+                                  {config.code ? (
+                                    <span
+                                      className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black ${config.annotationStyle}`}
+                                    >
+                                      {config.code}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <div className="flex min-w-0 flex-col">
+                                  <span className="truncate text-xs leading-tight font-bold">
+                                    {opt.label.split(" ")[0]}
+                                  </span>
+                                  <span className="text-[10px] leading-tight text-slate-400">
+                                    {isNone
+                                      ? "常規棋"
+                                      : (config.label.split(" ")[1] ?? "")}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Hero Stock Display & Visual Pips */}
+                              <div className="flex shrink-0 flex-col items-end gap-1">
+                                {isNone ? (
+                                  <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-300">
+                                    ∞ 無限
+                                  </span>
+                                ) : (
+                                  <div
+                                    className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black tracking-tight ${
+                                      count >= maxHand
+                                        ? "animate-pulse border border-amber-400 bg-amber-500/25 text-amber-200 shadow-xs ring-1 ring-amber-400/60"
+                                        : count > 0
+                                          ? "border border-emerald-400/90 bg-emerald-500/25 text-emerald-100 shadow-xs ring-1 ring-emerald-400/50"
+                                          : "border border-slate-800 bg-slate-900/80 text-slate-500"
+                                    }`}
+                                  >
+                                    <span className="text-xs">
+                                      {count > 0 ? `x${count.toString()}` : "0"}
+                                    </span>
+                                    <span className="text-[10px] font-normal opacity-75">
+                                      / {maxHand.toString()}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Visual Stock Pips (庫存點數槽) */}
+                                {!isNone && (
+                                  <div
+                                    className="flex items-center gap-1"
+                                    title={`可用庫存：${count.toString()}/${maxHand.toString()} 枚`}
+                                  >
+                                    {Array.from({ length: maxHand }).map(
+                                      (_, idx) => {
+                                        const isFilled = idx < count;
+                                        return (
+                                          <span
+                                            key={idx}
+                                            className={`inline-block h-2 w-2 rounded-full transition-all ${
+                                              isFilled
+                                                ? count >= maxHand
+                                                  ? "bg-amber-400 shadow-xs ring-1 shadow-amber-400 ring-amber-300"
+                                                  : "bg-emerald-400 shadow-xs ring-1 shadow-emerald-400 ring-emerald-300"
+                                                : "border border-slate-700 bg-slate-800/80"
+                                            }`}
+                                          />
+                                        );
+                                      },
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Secondary Helper Section: Cooldown & Status */}
+                            <div className="mt-2 w-full border-t border-slate-800/80 pt-1.5">
+                              {isForbidden ? (
+                                <span className="text-[10px] font-bold text-red-400">
+                                  🚫 強制特技：禁止落常規棋
+                                </span>
+                              ) : isNone ? (
+                                <span className="text-[10px] text-slate-400">
+                                  隨時可用・無冷卻限制
+                                </span>
+                              ) : count >= maxHand ? (
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="font-bold text-amber-300">
+                                    ⚡ 滿額就緒（隨時部署）
+                                  </span>
+                                  <span className="font-mono text-[9px] text-amber-400/90">
+                                    MAX
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span
+                                      className={
+                                        count === 0
+                                          ? "font-medium text-amber-400/90"
+                                          : "text-slate-400"
+                                      }
+                                    >
+                                      {count === 0
+                                        ? "⏳ 補給充能中"
+                                        : "下枚補給"}
+                                    </span>
+                                    <span className="font-mono font-bold text-slate-200">
+                                      {charge.toString()}/{cd.toString()} 回合
+                                    </span>
+                                  </div>
+                                  <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+                                    <div
+                                      className={`h-full transition-all duration-300 ${
+                                        count === 0
+                                          ? charge >= cd - 1
+                                            ? "bg-amber-400"
+                                            : "bg-amber-600/80"
+                                          : charge >= cd - 1
+                                            ? "bg-rose-400"
+                                            : "bg-rose-600/70"
+                                      }`}
+                                      style={{
+                                        width: `${Math.min(100, Math.round((charge / cd) * 100)).toString()}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })()}

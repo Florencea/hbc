@@ -199,3 +199,10 @@ export interface AvailableMoves {
   pioneerMoves: Coord[];
   isPioneerActive: boolean;
 }
+
+export type AIDifficulty = "EASY" | "MEDIUM" | "HARD";
+
+export interface AIMoveDecision {
+  action: Action;
+  score: number;
+}
