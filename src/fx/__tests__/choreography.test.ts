@@ -141,18 +141,18 @@ describe("event choreography", () => {
     expect(callLog).toEqual([
       "place:5,5:NONE",
       "blocked:5,7",
-      "text:BLOCKED!:5,7:blocked",
+      "text:翡翠城壁 格擋！:5,7:blocked",
       "reveal:5,7:WALL:BLOCK",
       "flip:5,6:1",
       "flip:6,6:1",
       "flash:purple:250",
       "counter:6,6:reversed=1:team=2",
-      "text:ABYSS COUNTER!:6,6:counter",
+      "text:深淵復仇者 反擊！:6,6:counter",
       "shake:200",
       "bomb:4,4:blast=2:team=1",
-      "text:CHAIN BOMB!:4,4:bomb",
+      "text:殺戮盛宴 引爆！:4,4:bomb",
       "purify:7,7:affected=1:team=1",
-      "text:PURIFIED:7,7:purify",
+      "text:救贖之光 淨化！:7,7:purify",
       "pioneer:10,10",
     ]);
 
@@ -174,5 +174,28 @@ describe("event choreography", () => {
     const delayFn = vi.fn().mockResolvedValue(undefined);
     await playEvents([], { delayFn });
     expect(delayFn).not.toHaveBeenCalled();
+  });
+
+  it("triggers floating combat text when PIERCE is revealed", async () => {
+    const texts: string[] = [];
+    await playEvents(
+      [
+        {
+          type: "PIECE_REVEALED",
+          coord: { x: 3, y: 3 },
+          skillType: "PIERCE",
+          reason: "PENETRATE",
+        },
+      ],
+      {
+        onAddFloatingText: (text, coord, variant) => {
+          texts.push(
+            `${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`,
+          );
+        },
+      },
+    );
+
+    expect(texts).toEqual(["天空守望者 貫穿！:3,3:pierce"]);
   });
 });

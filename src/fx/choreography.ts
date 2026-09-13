@@ -8,7 +8,8 @@ import {
   playPurifySound,
 } from "./sound.ts";
 
-export type CombatTextVariant = "blocked" | "counter" | "bomb" | "purify";
+export type CombatTextVariant =
+  "blocked" | "counter" | "bomb" | "purify" | "pierce";
 
 export interface EventHandlers {
   onPiecePlaced?: (coord: Coord, piece: Piece) => void;
@@ -79,7 +80,7 @@ export async function playEvents(
       case "RAYCAST_BLOCKED": {
         const wallCoord = event.wallPos ?? event.coord;
         handlers.onRaycastBlocked?.(wallCoord);
-        handlers.onAddFloatingText?.("BLOCKED!", wallCoord, "blocked");
+        handlers.onAddFloatingText?.("翡翠城壁 格擋！", wallCoord, "blocked");
         playBlockSound();
         await delay(250);
         break;
@@ -87,6 +88,13 @@ export async function playEvents(
 
       case "PIECE_REVEALED": {
         handlers.onPieceRevealed?.(event.coord, event.skillType, event.reason);
+        if (event.skillType === "PIERCE") {
+          handlers.onAddFloatingText?.(
+            "天空守望者 貫穿！",
+            event.coord,
+            "pierce",
+          );
+        }
         break;
       }
 
@@ -108,7 +116,11 @@ export async function playEvents(
           event.reversedCoords,
           event.defenderTeamId,
         );
-        handlers.onAddFloatingText?.("ABYSS COUNTER!", event.coord, "counter");
+        handlers.onAddFloatingText?.(
+          "深淵復仇者 反擊！",
+          event.coord,
+          "counter",
+        );
         playCounterSound();
         await delay(150);
         break;
@@ -121,7 +133,7 @@ export async function playEvents(
           event.blastCoords,
           event.teamId,
         );
-        handlers.onAddFloatingText?.("CHAIN BOMB!", event.coord, "bomb");
+        handlers.onAddFloatingText?.("殺戮盛宴 引爆！", event.coord, "bomb");
         playBombSound();
         await delay(200);
         break;
@@ -133,7 +145,7 @@ export async function playEvents(
           event.affectedCoords,
           event.teamId,
         );
-        handlers.onAddFloatingText?.("PURIFIED", event.coord, "purify");
+        handlers.onAddFloatingText?.("救贖之光 淨化！", event.coord, "purify");
         playPurifySound();
         await delay(250);
         break;

@@ -23,6 +23,8 @@ function getVariantBadgeClass(variant: CombatTextVariant): string {
       return "border-rose-500/80 bg-rose-950/95 text-rose-200 shadow-rose-950/60 ring-1 ring-rose-400/50";
     case "purify":
       return "border-amber-400/80 bg-amber-950/95 text-amber-200 shadow-amber-950/60 ring-1 ring-amber-400/50";
+    case "pierce":
+      return "border-cyan-400/80 bg-cyan-950/95 text-cyan-200 shadow-cyan-950/60 ring-1 ring-cyan-400/50";
   }
 }
 
@@ -56,6 +58,7 @@ export function FloatingCombatText({
               {item.variant === "counter" && <span>🌌</span>}
               {item.variant === "purify" && <span>✨</span>}
               {item.variant === "blocked" && <span>🛡️</span>}
+              {item.variant === "pierce" && <span>🏹</span>}
               <span>{item.text}</span>
             </span>
           </div>

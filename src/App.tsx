@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BoardOverlay,
   type AuraPulseEffect,
@@ -42,12 +42,12 @@ function getTeamColorClass(teamId: number): string {
 
 function getTeamName(teamId: number): string {
   if (teamId === 0) {
-    return "Neutral Anchor";
+    return "中立錨點";
   }
   if (teamId === 1) {
-    return "Team 1 (Sky)";
+    return "第一隊（蒼藍）";
   }
-  return "Team 2 (Rose)";
+  return "第二隊（緋紅）";
 }
 
 function getLegalMarkerClass(teamId: number, isPioneer: boolean): string {
@@ -64,18 +64,18 @@ function getLegalMarkerClass(teamId: number, isPioneer: boolean): string {
 const MAP_PRESETS: { preset: MapPreset; label: string; desc: string }[] = [
   {
     preset: "CROSSROADS",
-    label: "Crossroads",
-    desc: "Center Cross Anchors",
+    label: "十字路口",
+    desc: "中心十字錨點",
   },
   {
     preset: "ARCHIPELAGO",
-    label: "Archipelago",
-    desc: "4 Quadrant Islands",
+    label: "群島孤域",
+    desc: "四象限孤島",
   },
   {
     preset: "TRENCHES",
-    label: "Trenches",
-    desc: "Intersecting Paths",
+    label: "交錯戰壕",
+    desc: "縱橫交錯道",
   },
 ];
 
@@ -88,54 +88,105 @@ interface SkillVisualConfig {
 
 const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
   NONE: {
-    label: "Normal (NONE)",
+    label: "常規棋",
     annotationStyle: "",
     buttonStyle: "bg-slate-800 text-slate-200 border-slate-700",
     code: "",
   },
   WALL: {
-    label: "Wall (Green)",
+    label: "翡翠城壁 (綠)",
     annotationStyle:
       "bg-slate-950/85 text-emerald-400 border border-emerald-500/50",
     buttonStyle: "bg-emerald-950/60 text-emerald-200 border-emerald-800/80",
-    code: "W",
+    code: "壁",
   },
   PIERCE: {
-    label: "Pierce (Blue)",
+    label: "天空守望者 (藍)",
     annotationStyle: "bg-slate-950/85 text-cyan-300 border border-cyan-400/50",
     buttonStyle: "bg-sky-950/60 text-sky-200 border-sky-800/80",
-    code: "P",
+    code: "守",
   },
   BOMB: {
-    label: "Bomb (Red)",
+    label: "殺戮盛宴 (紅)",
     annotationStyle: "bg-slate-950/85 text-rose-400 border border-rose-400/50",
     buttonStyle: "bg-rose-950/60 text-rose-200 border-rose-800/80",
-    code: "B",
+    code: "宴",
   },
   PURIFY: {
-    label: "Purify (Yellow)",
+    label: "救贖之光 (黃)",
     annotationStyle:
       "bg-slate-950/85 text-amber-400 border border-amber-400/50",
     buttonStyle: "bg-amber-950/60 text-amber-200 border-amber-800/80",
-    code: "U",
+    code: "光",
   },
   COUNTER: {
-    label: "Counter (Purple)",
-    annotationStyle:
-      "bg-slate-950/85 text-purple-400 border border-purple-400/50",
-    buttonStyle: "bg-purple-950/60 text-purple-200 border-purple-800/80",
-    code: "C",
+    label: "深淵復仇者 (黑)",
+    annotationStyle: "bg-black/90 text-purple-300 border border-purple-500/60",
+    buttonStyle:
+      "bg-slate-950/90 text-purple-200 border-purple-900/80 hover:border-purple-600/80",
+    code: "仇",
   },
 };
 
 const SKILL_OPTIONS: { type: SkillType; label: string }[] = [
-  { type: "NONE", label: "Normal (NONE)" },
-  { type: "WALL", label: "Wall (Green)" },
-  { type: "PIERCE", label: "Pierce (Blue)" },
-  { type: "BOMB", label: "Bomb (Red)" },
-  { type: "PURIFY", label: "Purify (Yellow)" },
-  { type: "COUNTER", label: "Counter (Purple)" },
+  { type: "NONE", label: "常規棋" },
+  { type: "WALL", label: "翡翠城壁 (綠)" },
+  { type: "PIERCE", label: "天空守望者 (藍)" },
+  { type: "BOMB", label: "殺戮盛宴 (紅)" },
+  { type: "PURIFY", label: "救贖之光 (黃)" },
+  { type: "COUNTER", label: "深淵復仇者 (黑)" },
 ];
+
+function formatErrorMessage(msg: string): string {
+  if (msg.includes("outside assigned drop zone")) {
+    return "初始空降階段中，落子必須在指定的空降區域內！";
+  }
+  if (msg.includes("Forced special move required")) {
+    return "特技庫存已達上限！本回合強制施放特技，無法放置常規棋。";
+  }
+  if (msg.includes("Player does not have this skill")) {
+    return "特技庫存不足，無法放置該特技棋！";
+  }
+  if (msg.includes("Illegal move")) {
+    return "無效落子：必須夾殺至少一顆敵方棋子，或在拓荒階段進行合法橋接。";
+  }
+  if (msg.includes("already occupied")) {
+    return "該格已有棋子，無法重複落子！";
+  }
+  if (msg.includes("Not this player's turn")) {
+    return "非當前行動隊伍的回合！";
+  }
+  if (msg.includes("Cannot pass turn")) {
+    return "目前盤面仍有合法落子點，無法跳過回合！";
+  }
+  if (msg.includes("already over")) {
+    return "對局已結束！";
+  }
+  return msg;
+}
+
+interface ToastNotification {
+  key: number;
+  message: string;
+  type: "error" | "info" | "warning";
+}
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  PIECE_PLACED: "落子",
+  PIONEER_PLACED: "拓荒落子",
+  RAYCAST_BLOCKED: "翡翠格擋",
+  PIECE_REVEALED: "特技揭示",
+  FLIP_BATCH: "夾殺翻轉",
+  COUNTER_TRIGGERED: "深淵反擊",
+  BOMB_TRIGGERED: "殺戮引爆",
+  PURIFY_PULSE: "救贖脈衝",
+  SKILL_ACQUIRED: "特技充能",
+  FORCED_SPECIAL_TRIGGERED: "強制特技",
+  DROP_PHASE_STARTED: "空降開始",
+  DROP_PHASE_ENDED: "全域開啟",
+  TURN_CHANGED: "回合輪替",
+  GAME_OVER: "對局結束",
+};
 
 /**
  * Priority order when forced special is triggered:
@@ -183,7 +234,28 @@ export default function App() {
   const [eventLogs, setEventLogs] = useState<GameEvent[]>(
     () => createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).events,
   );
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastNotification | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [toast]);
+
+  const handleShowToast = (
+    message: string,
+    type: "error" | "info" | "warning" = "error",
+  ) => {
+    setToast((prev) => ({
+      key: (prev?.key ?? 0) + 1,
+      message,
+      type,
+    }));
+  };
 
   // Animation and Visual FX states
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
@@ -479,7 +551,6 @@ export default function App() {
 
   const handleCellClick = (coord: Coord) => {
     if (isAnimating) return;
-    setErrorMsg(null);
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PLACE_PIECE",
@@ -490,14 +561,13 @@ export default function App() {
       void executeEventChoreography(nextState, events);
     } catch (err) {
       if (err instanceof Error) {
-        setErrorMsg(err.message);
+        handleShowToast(formatErrorMessage(err.message), "error");
       }
     }
   };
 
   const handlePassTurn = () => {
     if (isAnimating) return;
-    setErrorMsg(null);
     try {
       const { nextState, events } = dispatch(gameState, {
         type: "PASS_TURN",
@@ -506,7 +576,7 @@ export default function App() {
       void executeEventChoreography(nextState, events);
     } catch (err) {
       if (err instanceof Error) {
-        setErrorMsg(err.message);
+        handleShowToast(formatErrorMessage(err.message), "error");
       }
     }
   };
@@ -518,7 +588,6 @@ export default function App() {
     setGameState(initial.state);
     setIntermediateBoard(null);
     setEventLogs(initial.events);
-    setErrorMsg(null);
     setSelectedSkill("NONE");
   };
 
@@ -531,8 +600,8 @@ export default function App() {
     setGameState(initial.state);
     setIntermediateBoard(null);
     setEventLogs(initial.events);
-    setErrorMsg(null);
     setSelectedSkill("NONE");
+    handleShowToast("對局已重設", "info");
   };
 
   // Team piece count
@@ -544,6 +613,40 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 p-4 font-sans text-slate-100 md:p-8">
+      {/* Floating Toast Notification Container - Does NOT displace the board layout */}
+      {toast && (
+        <div className="pointer-events-none fixed top-6 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center">
+          <div
+            key={toast.key}
+            className={`pointer-events-auto flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-xs font-semibold shadow-2xl backdrop-blur-md transition-all ${
+              toast.type === "error"
+                ? "border-rose-500/80 bg-rose-950/95 text-rose-100 shadow-rose-950/50"
+                : toast.type === "warning"
+                  ? "border-amber-500/80 bg-amber-950/95 text-amber-100 shadow-amber-950/50"
+                  : "border-sky-500/80 bg-sky-950/95 text-sky-100 shadow-sky-950/50"
+            }`}
+          >
+            <span>
+              {toast.type === "error"
+                ? "⚠️"
+                : toast.type === "warning"
+                  ? "⚡"
+                  : "ℹ️"}
+            </span>
+            <span>{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setToast(null);
+              }}
+              className="ml-2 cursor-pointer text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Screen Flash Overlay for Abyss Counter */}
       {screenFlash && (
         <div
@@ -556,11 +659,10 @@ export default function App() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-white">
             <span className="text-blue-500">HBC</span>
-            <span>Multi-Team Reversi Core Engine</span>
+            <span>多陣營黑白棋核心引擎</span>
           </h1>
           <p className="mt-1 text-xs text-slate-400">
-            5-Skill Variant, Hidden Traps & Chain Reaction (16x16 Headless
-            Engine)
+            五大技能棋、隱藏陷阱與連鎖反應（16x16 無頭引擎）
           </p>
         </div>
 
@@ -577,7 +679,7 @@ export default function App() {
                 : "border border-sky-500/40 bg-sky-950/40 text-sky-200 hover:bg-sky-900/60"
             }`}
           >
-            {isMuted ? "🔇 Muted" : "🔊 Sound On"}
+            {isMuted ? "🔇 靜音" : "🔊 音效開啟"}
           </button>
           <button
             type="button"
@@ -591,7 +693,7 @@ export default function App() {
                 : "bg-slate-800 text-slate-300 hover:bg-slate-700"
             }`}
           >
-            {isGodMode ? "God Mode (All Revealed)" : "Fog of War (Player View)"}
+            {isGodMode ? "上帝視角（全揭示）" : "戰爭迷霧（玩家視角）"}
           </button>
           <button
             type="button"
@@ -599,7 +701,7 @@ export default function App() {
             disabled={isAnimating}
             className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Reset Game
+            重設對局
           </button>
         </div>
       </header>
@@ -608,7 +710,7 @@ export default function App() {
       <section className="mx-auto mb-6 flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 shadow-md">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">
-            Map Preset:
+            地圖預設：
           </span>
           <div className="flex flex-wrap gap-2">
             {MAP_PRESETS.map(({ preset, label, desc }) => {
@@ -643,11 +745,11 @@ export default function App() {
 
         <div className="flex items-center gap-2">
           <span className="rounded bg-slate-800/80 px-2.5 py-1 text-xs text-slate-300">
-            <span className="text-amber-400">⚓ Neutral Anchors:</span>{" "}
+            <span className="text-amber-400">⚓ 中立錨點：</span>{" "}
             <span className="font-bold text-white">
               {neutralCount.toString()}
             </span>{" "}
-            pcs
+            顆
           </span>
         </div>
       </section>
@@ -655,86 +757,82 @@ export default function App() {
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left Side: Game Board */}
         <section className="flex flex-col items-center lg:col-span-8">
-          {errorMsg && (
-            <div className="mb-3 w-full rounded border border-red-800 bg-red-950/80 px-4 py-2 text-xs text-red-300">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Interaction Lock Indicator */}
-          {isAnimating && (
-            <div className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-purple-500/50 bg-purple-950/60 px-4 py-2 text-xs text-purple-200 shadow-md">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 animate-ping rounded-full bg-purple-400" />
-                <span className="font-bold tracking-wider uppercase">
-                  Resolving Chains...
+          {/* Consolidated Battlefield Status Bar - Stable height prevents board jitter */}
+          <div className="mb-3 flex min-h-12 w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-4 py-2 text-xs shadow-sm">
+            {isAnimating ? (
+              <div className="flex items-center gap-2 text-purple-300">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-purple-500" />
                 </span>
-                <span className="text-slate-300">
-                  Executing event sequence and combat animations.
+                <span className="font-bold tracking-wider">連鎖結算中...</span>
+                <span className="text-slate-400">
+                  正在執行事件序列與戰鬥動畫
                 </span>
               </div>
-              <span className="rounded bg-purple-900/60 px-2 py-0.5 font-mono text-[11px] text-purple-300">
-                Interaction Locked
-              </span>
-            </div>
-          )}
-
-          {gameState.isDropPhase ? (
-            <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 animate-ping rounded-full bg-amber-400" />
-                <span className="font-bold tracking-wider uppercase">
-                  Drop Phase Active (Turn 0 Setup)
+            ) : availableMoves.isPioneerActive ? (
+              <div className="flex items-center gap-2 text-amber-300">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
                 </span>
+                <span className="font-bold tracking-wider">拓荒階段啟動：</span>
                 <span className="text-slate-300">
-                  Placements restricted to assigned drop zone.
+                  無可夾殺路徑，請於領地 2 格內放置拓荒橋樑棋
                 </span>
               </div>
-              <div className="flex items-center gap-3 font-mono text-[11px]">
-                <span>
-                  Drop Turns Rem:{" "}
-                  <strong className="text-amber-300">
-                    {gameState.dropTurnsRemaining.toString()}
-                  </strong>
+            ) : gameState.isDropPhase ? (
+              <div className="flex items-center gap-2 text-amber-300">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
                 </span>
-                {activePlayer?.dropZone && (
-                  <span className="rounded bg-amber-900/60 px-2 py-0.5 text-amber-200">
-                    Zone ({activePlayer.dropZone.center.x.toString()},{" "}
-                    {activePlayer.dropZone.center.y.toString()}) R=
-                    {activePlayer.dropZone.radius.toString()}
+                <span className="font-bold tracking-wider">
+                  初始空降階段（Turn 0 配置）：
+                </span>
+                <span className="text-slate-300">
+                  棋子落點限制於專屬空降區域內
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="font-semibold">
+                  全域棋局階段：解除空降限制，套用標準黑白棋規則
+                </span>
+              </div>
+            )}
+
+            {/* Right Status Badge */}
+            <div className="flex shrink-0 items-center gap-2">
+              {isAnimating ? (
+                <span className="rounded bg-purple-900/60 px-2 py-0.5 font-mono text-[11px] font-bold text-purple-300 ring-1 ring-purple-500/40">
+                  操作鎖定
+                </span>
+              ) : availableMoves.isPioneerActive ? (
+                <span className="rounded bg-amber-900/60 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-300 ring-1 ring-amber-500/40">
+                  {availableMoves.pioneerMoves.length.toString()} 個拓荒目標點
+                </span>
+              ) : gameState.isDropPhase ? (
+                <div className="flex items-center gap-2 font-mono text-[11px]">
+                  <span className="rounded bg-amber-900/60 px-2 py-0.5 text-amber-300">
+                    剩餘 {gameState.dropTurnsRemaining.toString()} 回合
                   </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="mb-3 flex w-full items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-950/30 px-4 py-1.5 text-xs text-emerald-300">
-              <span className="font-semibold">
-                🌐 Full-Board Phase: Drop restrictions lifted! Standard Reversi
-                rules apply.
-              </span>
-              <span className="text-[11px] text-emerald-400/80">
-                Preset: {gameState.mapPreset}
-              </span>
-            </div>
-          )}
-
-          {availableMoves.isPioneerActive && (
-            <div className="mb-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/50 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 animate-ping rounded-full bg-amber-400" />
-                <span className="font-bold tracking-wider uppercase">
-                  Pioneer Phase Active:
+                  {activePlayer?.dropZone && (
+                    <span className="hidden rounded bg-slate-800 px-2 py-0.5 text-slate-300 sm:inline">
+                      中心 ({activePlayer.dropZone.center.x.toString()},{" "}
+                      {activePlayer.dropZone.center.y.toString()}) 半徑=
+                      {activePlayer.dropZone.radius.toString()}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-emerald-400">
+                  地圖：{gameState.mapPreset}
                 </span>
-                <span>
-                  No capture moves available. Place a bridge piece within 2
-                  tiles of your territory.
-                </span>
-              </div>
-              <span className="rounded bg-amber-900/60 px-2 py-0.5 font-mono text-[11px] text-amber-300">
-                {availableMoves.pioneerMoves.length.toString()} bridge targets
-              </span>
+              )}
             </div>
-          )}
+          </div>
 
           <div
             className={`relative rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl transition-transform ${
@@ -866,16 +964,16 @@ export default function App() {
           <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                Match Telemetry
+                對局遙測資訊
               </span>
               <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-bold text-slate-200">
-                Turn {gameState.currentTurn.toString()}
+                第 {gameState.currentTurn.toString()} 回合
               </span>
             </div>
 
             <div className="mt-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Active Turn:</span>
+                <span className="text-xs text-slate-400">當前回合：</span>
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
                   <span
                     className={`inline-block h-2.5 w-2.5 rounded-full border ${
@@ -885,7 +983,7 @@ export default function App() {
                     }`}
                   />
                   <span>
-                    {activePlayer?.name ?? "Unknown"} (
+                    {activePlayer?.name ?? "未知玩家"} (
                     {getTeamName(activePlayer?.teamId ?? 1)})
                   </span>
                 </span>
@@ -897,31 +995,31 @@ export default function App() {
                 disabled={isAnimating || gameState.isGameOver}
                 className="cursor-pointer rounded bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Pass Turn
+                跳過回合
               </button>
             </div>
 
             {/* Game Phase & Drop Zone Status */}
             <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
-              <span>Game Phase:</span>
+              <span>遊戲階段：</span>
               <span className="font-semibold text-slate-200">
                 {gameState.isDropPhase ? (
                   <span className="text-amber-400">
-                    Drop Phase ({gameState.dropTurnsRemaining.toString()} turns
-                    rem)
+                    初始空降階段（剩餘 {gameState.dropTurnsRemaining.toString()}{" "}
+                    回合）
                   </span>
                 ) : (
-                  <span className="text-emerald-400">Full-Board Play</span>
+                  <span className="text-emerald-400">全域對局</span>
                 )}
               </span>
             </div>
 
             {activePlayer?.dropZone && gameState.isDropPhase && (
               <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Active Drop Zone:</span>
+                <span>當前空降區：</span>
                 <span className="font-mono text-slate-300">
-                  Center ({activePlayer.dropZone.center.x.toString()},{" "}
-                  {activePlayer.dropZone.center.y.toString()}), R=
+                  中心 ({activePlayer.dropZone.center.x.toString()},{" "}
+                  {activePlayer.dropZone.center.y.toString()})，半徑=
                   {activePlayer.dropZone.radius.toString()}
                 </span>
               </div>
@@ -929,15 +1027,15 @@ export default function App() {
 
             <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-2 text-xs text-slate-400">
               <span className="font-semibold text-slate-300">
-                盤面棋數統計:
+                盤面棋數統計：
               </span>
               <div className="flex items-center gap-2 text-xs">
                 <span className="rounded-md border border-sky-500/40 bg-sky-950/80 px-2 py-0.5 font-bold text-sky-300">
-                  {team1Count.toString()} 藍 (Sky)
+                  {team1Count.toString()} 蒼藍
                 </span>
                 <span className="text-slate-600">/</span>
                 <span className="rounded-md border border-rose-500/40 bg-rose-950/80 px-2 py-0.5 font-bold text-rose-300">
-                  {team2Count.toString()} 紅 (Rose)
+                  {team2Count.toString()} 緋紅
                 </span>
                 <span className="text-slate-600">/</span>
                 <span className="rounded-md border border-amber-500/40 bg-slate-800 px-2 py-0.5 font-bold text-amber-300">
@@ -962,15 +1060,15 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded-full border border-sky-300/80 bg-sky-400" />
                     <span className="text-xs font-bold text-slate-200">
-                      Team 1 (Sky)
+                      第一隊（蒼藍）
                     </span>
                     {isActive ? (
                       <span className="animate-pulse rounded border border-sky-500/40 bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
-                        ACTIVE TURN
+                        行動中
                       </span>
                     ) : (
                       <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
-                        Waiting
+                        等待中
                       </span>
                     )}
                   </div>
@@ -978,14 +1076,14 @@ export default function App() {
                   <div className="flex items-center gap-1.5">
                     {player1?.isForcedSpecial && (
                       <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
-                        ⚡ FORCED
+                        ⚡ 強制特技
                       </span>
                     )}
                     <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
-                      特技: {player1SpecialsCount.toString()} 套
+                      特技: {player1SpecialsCount.toString()} 枚
                     </span>
                     <span className="rounded-md border border-sky-400/40 bg-sky-950/60 px-2 py-0.5 text-[11px] font-black text-sky-200 shadow-xs">
-                      盤面: {team1Count.toString()} 棋
+                      盤面: {team1Count.toString()} 顆
                     </span>
                   </div>
                 </div>
@@ -995,10 +1093,10 @@ export default function App() {
                     <span className="text-base">⚡</span>
                     <div className="flex flex-col">
                       <span className="font-bold tracking-wide text-amber-300">
-                        強制技能階段 (Forced Special)
+                        強制特技施放階段 (Forced Special)
                       </span>
                       <span className="text-[11px] text-amber-200/90">
-                        技能庫存溢出！已自動選取最強力的特殊棋種（
+                        特技庫存已達上限且充能完畢！已自動選取優先度最高之特技（
                         {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
                         ），本回合必須放置特殊棋。
                       </span>
@@ -1040,12 +1138,12 @@ export default function App() {
                         }}
                         title={
                           !isActive
-                            ? "Waiting for Team 1's turn"
+                            ? "等待第一隊（蒼藍）回合"
                             : isForbidden
-                              ? "Blocked by Forced Special"
+                              ? "強制特技生效中，禁止放置常規棋"
                               : isOutOfStock
-                                ? "No stock available (count: 0)"
-                                : `Select ${config.label}`
+                                ? "無庫存可用（冷卻中）"
+                                : `選擇 ${config.label}`
                         }
                         className={`relative flex flex-col gap-1.5 rounded-lg border p-2.5 text-left text-xs transition-all ${
                           isSelected
@@ -1086,10 +1184,10 @@ export default function App() {
                             {isNone
                               ? "∞ 無限"
                               : count >= maxHand
-                                ? `庫存 ${count.toString()}/${maxHand.toString()} (滿)`
+                                ? `庫存 ${count.toString()}/${maxHand.toString()}（滿）`
                                 : count > 0
                                   ? `庫存 ${count.toString()}/${maxHand.toString()}`
-                                  : `0/${maxHand.toString()} (無庫存)`}
+                                  : `0/${maxHand.toString()}（無庫存）`}
                           </span>
                         </div>
 
@@ -1128,7 +1226,7 @@ export default function App() {
                           !isForbidden &&
                           isActive && (
                             <span className="text-[10px] font-semibold text-rose-400">
-                              ❌ 庫存為 0 (需充能)
+                              ❌ 無庫存（冷卻中）
                             </span>
                           )}
                         {!isNone && count > 0 && !isForbidden && isActive && (
@@ -1159,15 +1257,15 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded-full border border-rose-300/80 bg-rose-500" />
                     <span className="text-xs font-bold text-slate-200">
-                      Team 2 (Rose)
+                      第二隊（緋紅）
                     </span>
                     {isActive ? (
                       <span className="animate-pulse rounded border border-rose-500/40 bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                        ACTIVE TURN
+                        行動中
                       </span>
                     ) : (
                       <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-500">
-                        Waiting
+                        等待中
                       </span>
                     )}
                   </div>
@@ -1175,14 +1273,14 @@ export default function App() {
                   <div className="flex items-center gap-1.5">
                     {player2?.isForcedSpecial && (
                       <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
-                        ⚡ FORCED
+                        ⚡ 強制特技
                       </span>
                     )}
                     <span className="rounded-md border border-purple-500/40 bg-purple-950/60 px-2 py-0.5 text-[11px] font-black text-purple-200 shadow-xs">
-                      特技: {player2SpecialsCount.toString()} 套
+                      特技: {player2SpecialsCount.toString()} 枚
                     </span>
                     <span className="rounded-md border border-rose-400/40 bg-rose-950/60 px-2 py-0.5 text-[11px] font-black text-rose-200 shadow-xs">
-                      盤面: {team2Count.toString()} 棋
+                      盤面: {team2Count.toString()} 顆
                     </span>
                   </div>
                 </div>
@@ -1192,10 +1290,10 @@ export default function App() {
                     <span className="text-base">⚡</span>
                     <div className="flex flex-col">
                       <span className="font-bold tracking-wide text-amber-300">
-                        強制技能階段 (Forced Special)
+                        強制特技施放階段 (Forced Special)
                       </span>
                       <span className="text-[11px] text-amber-200/90">
-                        技能庫存溢出！已自動選取最強力的特殊棋種（
+                        特技庫存已達上限且充能完畢！已自動選取優先度最高之特技（
                         {SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}
                         ），本回合必須放置特殊棋。
                       </span>
@@ -1237,12 +1335,12 @@ export default function App() {
                         }}
                         title={
                           !isActive
-                            ? "Waiting for Team 2's turn"
+                            ? "等待第二隊（緋紅）回合"
                             : isForbidden
-                              ? "Blocked by Forced Special"
+                              ? "強制特技生效中，禁止放置常規棋"
                               : isOutOfStock
-                                ? "No stock available (count: 0)"
-                                : `Select ${config.label}`
+                                ? "無庫存可用（冷卻中）"
+                                : `選擇 ${config.label}`
                         }
                         className={`relative flex flex-col gap-1.5 rounded-lg border p-2.5 text-left text-xs transition-all ${
                           isSelected
@@ -1283,10 +1381,10 @@ export default function App() {
                             {isNone
                               ? "∞ 無限"
                               : count >= maxHand
-                                ? `庫存 ${count.toString()}/${maxHand.toString()} (滿)`
+                                ? `庫存 ${count.toString()}/${maxHand.toString()}（滿）`
                                 : count > 0
                                   ? `庫存 ${count.toString()}/${maxHand.toString()}`
-                                  : `0/${maxHand.toString()} (無庫存)`}
+                                  : `0/${maxHand.toString()}（無庫存）`}
                           </span>
                         </div>
 
@@ -1325,7 +1423,7 @@ export default function App() {
                           !isForbidden &&
                           isActive && (
                             <span className="text-[10px] font-semibold text-rose-400">
-                              ❌ 庫存為 0 (需充能)
+                              ❌ 無庫存（冷卻中）
                             </span>
                           )}
                         {!isNone && count > 0 && !isForbidden && isActive && (
@@ -1345,17 +1443,17 @@ export default function App() {
           <div className="flex min-h-64 flex-1 flex-col rounded-lg border border-slate-800 bg-slate-950 p-4">
             <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase">
-                Event Sourcing Stream
+                事件溯源日誌串流
               </span>
               <span className="text-xs text-slate-500">
-                {eventLogs.length.toString()} events
+                {eventLogs.length.toString()} 筆事件
               </span>
             </div>
 
             <div className="max-h-72 flex-1 space-y-2 overflow-y-auto pr-1 text-xs">
               {eventLogs.length === 0 ? (
                 <div className="py-4 text-center text-slate-500 italic">
-                  No events yet. Place a piece to trigger engine transitions.
+                  尚無事件。落子以觸發引擎狀態轉移。
                 </div>
               ) : (
                 eventLogs.map((ev, idx) => (
@@ -1364,23 +1462,50 @@ export default function App() {
                     className="flex flex-col gap-1 rounded border border-slate-800/80 bg-slate-900 p-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-blue-400">
-                        {ev.type}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-blue-400">
+                          {ev.type}
+                        </span>
+                        {EVENT_TYPE_LABELS[ev.type] && (
+                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
+                            {EVENT_TYPE_LABELS[ev.type]}
+                          </span>
+                        )}
+                      </div>
                       {ev.type === "DROP_PHASE_STARTED" && (
                         <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
-                          Preset: {ev.mapPreset}
+                          地圖預設：{ev.mapPreset}
                         </span>
                       )}
                       {ev.type === "PIONEER_PLACED" && (
                         <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
-                          Pioneer Bridge ({ev.coord.x.toString()},{" "}
+                          拓荒橋樑 ({ev.coord.x.toString()},{" "}
                           {ev.coord.y.toString()})
                         </span>
                       )}
                       {ev.type === "DROP_PHASE_ENDED" && (
                         <span className="rounded border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
-                          Full-Board Active
+                          全域對局已啟動
+                        </span>
+                      )}
+                      {ev.type === "RAYCAST_BLOCKED" && (
+                        <span className="rounded border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+                          翡翠城壁格擋
+                        </span>
+                      )}
+                      {ev.type === "COUNTER_TRIGGERED" && (
+                        <span className="rounded border border-purple-500/40 bg-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-300">
+                          深淵復仇者反擊
+                        </span>
+                      )}
+                      {ev.type === "BOMB_TRIGGERED" && (
+                        <span className="rounded border border-rose-500/40 bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-bold text-rose-300">
+                          殺戮盛宴引爆
+                        </span>
+                      )}
+                      {ev.type === "PURIFY_PULSE" && (
+                        <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                          救贖之光淨化
                         </span>
                       )}
                     </div>
