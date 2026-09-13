@@ -12,23 +12,23 @@ import {
   type SkillType,
 } from "./engine/index.ts";
 
-function getTeamShapeClass(teamId: number): string {
+function getTeamColorClass(teamId: number): string {
   if (teamId === 1) {
-    return "rounded-full";
+    return "border-sky-300/80 bg-sky-400 text-slate-950";
   }
-  return "rounded-xs";
+  return "border-rose-300/80 bg-rose-500 text-white";
 }
 
-function getTeamShapeName(teamId: number): string {
+function getTeamName(teamId: number): string {
   if (teamId === 1) {
-    return "Circle";
+    return "Team 1 (Sky)";
   }
-  return "Square";
+  return "Team 2 (Rose)";
 }
 
 interface SkillVisualConfig {
   label: string;
-  pieceStyle: string;
+  annotationStyle: string;
   buttonStyle: string;
   code: string;
 }
@@ -36,38 +36,40 @@ interface SkillVisualConfig {
 const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
   NONE: {
     label: "Normal (NONE)",
-    pieceStyle: "bg-slate-300 text-slate-900 border border-slate-400/70",
+    annotationStyle: "",
     buttonStyle: "bg-slate-800 text-slate-200 border-slate-700",
     code: "",
   },
   WALL: {
     label: "Wall (Green)",
-    pieceStyle:
-      "bg-emerald-600/85 text-emerald-100 border border-emerald-400/60",
+    annotationStyle:
+      "bg-slate-950/85 text-emerald-400 border border-emerald-500/50",
     buttonStyle: "bg-emerald-950/60 text-emerald-200 border-emerald-800/80",
     code: "W",
   },
   PIERCE: {
     label: "Pierce (Blue)",
-    pieceStyle: "bg-sky-600/85 text-sky-100 border border-sky-400/60",
+    annotationStyle: "bg-slate-950/85 text-cyan-300 border border-cyan-400/50",
     buttonStyle: "bg-sky-950/60 text-sky-200 border-sky-800/80",
     code: "P",
   },
   BOMB: {
     label: "Bomb (Red)",
-    pieceStyle: "bg-rose-600/85 text-rose-100 border border-rose-400/60",
+    annotationStyle: "bg-slate-950/85 text-rose-400 border border-rose-400/50",
     buttonStyle: "bg-rose-950/60 text-rose-200 border-rose-800/80",
     code: "B",
   },
   PURIFY: {
     label: "Purify (Yellow)",
-    pieceStyle: "bg-amber-500/85 text-amber-950 border border-amber-300/60",
+    annotationStyle:
+      "bg-slate-950/85 text-amber-400 border border-amber-400/50",
     buttonStyle: "bg-amber-950/60 text-amber-200 border-amber-800/80",
     code: "U",
   },
   COUNTER: {
     label: "Counter (Purple)",
-    pieceStyle: "bg-purple-600/85 text-purple-100 border border-purple-400/60",
+    annotationStyle:
+      "bg-slate-950/85 text-purple-400 border border-purple-400/50",
     buttonStyle: "bg-purple-950/60 text-purple-200 border-purple-800/80",
     code: "C",
   },
@@ -280,13 +282,23 @@ export default function App() {
                       {/* Piece Representation */}
                       {piece && (
                         <div
-                          className={`flex h-5 w-5 items-center justify-center text-[9px] font-bold shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${getTeamShapeClass(
+                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${getTeamColorClass(
                             piece.teamId,
-                          )} ${SKILL_CONFIG[piece.skillType].pieceStyle} ${
-                            !piece.isRevealed ? "border-dashed" : ""
+                          )} ${
+                            !piece.isRevealed
+                              ? "border-dashed ring-1 ring-slate-400/50"
+                              : ""
                           }`}
                         >
-                          {SKILL_CONFIG[piece.skillType].code}
+                          {SKILL_CONFIG[piece.skillType].code && (
+                            <span
+                              className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-black sm:h-4 sm:w-4 sm:text-[10px] ${
+                                SKILL_CONFIG[piece.skillType].annotationStyle
+                              }`}
+                            >
+                              {SKILL_CONFIG[piece.skillType].code}
+                            </span>
+                          )}
                         </div>
                       )}
                     </button>
@@ -315,14 +327,15 @@ export default function App() {
                 <span className="text-xs text-slate-400">Active Turn:</span>
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
                   <span
-                    className={`inline-block h-2.5 w-2.5 border border-slate-400/80 bg-slate-300 ${getTeamShapeClass(
-                      activePlayer?.teamId ?? 1,
-                    )}`}
+                    className={`inline-block h-2.5 w-2.5 rounded-full border ${
+                      activePlayer?.teamId === 1
+                        ? "border-sky-300 bg-sky-400"
+                        : "border-rose-400 bg-rose-500"
+                    }`}
                   />
                   <span>
-                    {activePlayer?.name ?? "Unknown"} (Team{" "}
-                    {activePlayer?.teamId.toString() ?? ""} ·{" "}
-                    {getTeamShapeName(activePlayer?.teamId ?? 1)})
+                    {activePlayer?.name ?? "Unknown"} (
+                    {getTeamName(activePlayer?.teamId ?? 1)})
                   </span>
                 </span>
               </div>
@@ -337,7 +350,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Team 1 Panel (Circle) */}
+          {/* Team 1 Panel (Sky) */}
           {(() => {
             const isActive = activePlayer?.teamId === 1;
             return (
@@ -350,9 +363,9 @@ export default function App() {
               >
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block h-3.5 w-3.5 rounded-full border border-slate-400/80 bg-slate-300" />
+                    <span className="inline-block h-3.5 w-3.5 rounded-full border border-sky-300/80 bg-sky-400" />
                     <span className="text-xs font-bold text-slate-200">
-                      Team 1 (Circle)
+                      Team 1 (Sky)
                     </span>
                     {isActive ? (
                       <span className="animate-pulse rounded border border-sky-500/40 bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
@@ -437,10 +450,14 @@ export default function App() {
                       >
                         <div className="flex w-full items-center justify-between gap-1">
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-xs text-[9px] font-bold ${config.pieceStyle}`}
-                            >
-                              {config.code}
+                            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-sky-300/80 bg-sky-400 shadow-xs">
+                              {config.code ? (
+                                <span
+                                  className={`flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-black ${config.annotationStyle}`}
+                                >
+                                  {config.code}
+                                </span>
+                              ) : null}
                             </span>
                             <span className="truncate text-[11px] font-semibold">
                               {opt.label.split(" ")[0]}
@@ -509,25 +526,25 @@ export default function App() {
             );
           })()}
 
-          {/* Team 2 Panel (Square) */}
+          {/* Team 2 Panel (Rose) */}
           {(() => {
             const isActive = activePlayer?.teamId === 2;
             return (
               <div
                 className={`flex flex-col gap-3 rounded-lg border p-4 transition-all ${
                   isActive
-                    ? "border-sky-500/80 bg-slate-950 shadow-lg ring-1 shadow-sky-950/30 ring-sky-500/40"
+                    ? "border-rose-500/80 bg-slate-950 shadow-lg ring-1 shadow-rose-950/30 ring-rose-500/40"
                     : "border-slate-800/80 bg-slate-950/60 opacity-80"
                 }`}
               >
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block h-3.5 w-3.5 rounded-xs border border-slate-400/80 bg-slate-300" />
+                    <span className="inline-block h-3.5 w-3.5 rounded-full border border-rose-300/80 bg-rose-500" />
                     <span className="text-xs font-bold text-slate-200">
-                      Team 2 (Square)
+                      Team 2 (Rose)
                     </span>
                     {isActive ? (
-                      <span className="animate-pulse rounded border border-sky-500/40 bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
+                      <span className="animate-pulse rounded border border-rose-500/40 bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
                         ACTIVE TURN
                       </span>
                     ) : (
@@ -601,7 +618,7 @@ export default function App() {
                         }
                         className={`relative flex flex-col gap-1.5 rounded-lg border p-2.5 text-left text-xs transition-all ${
                           isSelected
-                            ? "border-sky-400 bg-slate-800 text-white shadow-md ring-2 ring-sky-500/50"
+                            ? "border-rose-400 bg-slate-800 text-white shadow-md ring-2 ring-rose-500/50"
                             : isDisabled
                               ? "cursor-not-allowed border-slate-800/60 bg-slate-900/30 text-slate-500 opacity-40"
                               : `${config.buttonStyle} cursor-pointer opacity-85 hover:opacity-100`
@@ -609,10 +626,14 @@ export default function App() {
                       >
                         <div className="flex w-full items-center justify-between gap-1">
                           <div className="flex min-w-0 items-center gap-1.5">
-                            <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-xs text-[9px] font-bold ${config.pieceStyle}`}
-                            >
-                              {config.code}
+                            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-rose-300/80 bg-rose-500 shadow-xs">
+                              {config.code ? (
+                                <span
+                                  className={`flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-black ${config.annotationStyle}`}
+                                >
+                                  {config.code}
+                                </span>
+                              ) : null}
                             </span>
                             <span className="truncate text-[11px] font-semibold">
                               {opt.label.split(" ")[0]}
