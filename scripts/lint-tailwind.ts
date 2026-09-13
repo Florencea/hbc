@@ -86,6 +86,7 @@ async function main() {
     },
   });
 
+  const ROOT_FONT_SIZE = 16;
   const scanner = new Scanner({});
   const srcDir = path.resolve(projectRoot, "src");
   const files = collectSourceFiles(srcDir);
@@ -103,7 +104,9 @@ async function main() {
     const fileDiagnostics: Diagnostic[] = [];
 
     for (const item of candidates) {
-      const canonical = ds.canonicalizeCandidates([item.candidate])[0];
+      const canonical = ds.canonicalizeCandidates([item.candidate], {
+        rem: ROOT_FONT_SIZE,
+      })[0];
       if (canonical && canonical !== item.candidate) {
         const { line, col } = getLineAndCol(content, item.position);
         fileDiagnostics.push({
@@ -151,7 +154,7 @@ async function main() {
       );
     }
     console.error(
-      "\nRun `npm run lint:tailwind --fix` to auto-fix these issues.",
+      "\nRun `npm run lint:tailwind:fix` to auto-fix these issues.",
     );
     process.exit(1);
   }

@@ -206,7 +206,7 @@ export default function App() {
 
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-2xl">
             <div
-              className="grid gap-[2px] rounded bg-slate-800/60 p-[2px]"
+              className="grid gap-0.5 rounded bg-slate-800/60 p-0.5"
               style={{
                 gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
               }}
@@ -226,7 +226,7 @@ export default function App() {
                       disabled={
                         gameState.isGameOver || (piece !== null && !isLegal)
                       }
-                      className={`relative flex h-6 w-6 items-center justify-center rounded-[2px] transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
+                      className={`relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
                         (x + y) % 2 === 0
                           ? "bg-slate-900/90"
                           : "bg-slate-800/70"
