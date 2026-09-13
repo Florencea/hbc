@@ -1,4 +1,4 @@
-import type { Board, GameState, Piece } from "../types.ts";
+import type { Board, GameState, Piece, Player } from "../types.ts";
 
 export function createEmptyBoard(size = 16): Board {
   return Array.from({ length: size }, () =>
@@ -15,15 +15,49 @@ export function makePiece(
   return { teamId, playerId, skillType, isRevealed };
 }
 
-export function makeTestState(board: Board, activePlayerId = 1): GameState {
+function createTestPlayer(
+  id: number,
+  teamId: number,
+  name: string,
+  infiniteHand = true,
+): Player {
+  return {
+    id,
+    teamId,
+    name,
+    hand: {
+      NONE: Infinity,
+      WALL: infiniteHand ? Infinity : 0,
+      PIERCE: infiniteHand ? Infinity : 0,
+      BOMB: infiniteHand ? Infinity : 0,
+      PURIFY: infiniteHand ? Infinity : 0,
+      COUNTER: infiniteHand ? Infinity : 0,
+    },
+    charge: {
+      NONE: 0,
+      WALL: 0,
+      PIERCE: 0,
+      BOMB: 0,
+      PURIFY: 0,
+      COUNTER: 0,
+    },
+    isForcedSpecial: false,
+  };
+}
+
+export function makeTestState(
+  board: Board,
+  activePlayerId = 1,
+  players?: Player[],
+): GameState {
   return {
     board,
     size: 16,
     currentTurn: 1,
     activePlayerId,
-    players: [
-      { id: 1, teamId: 1, name: "Player 1" },
-      { id: 2, teamId: 2, name: "Player 2" },
+    players: players ?? [
+      createTestPlayer(1, 1, "Player 1", true),
+      createTestPlayer(2, 2, "Player 2", true),
     ],
     isGameOver: false,
     winnerTeamId: null,

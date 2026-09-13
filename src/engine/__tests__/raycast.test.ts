@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { traceRay, getLegalMoves, isValidCoord } from "../raycast.ts";
-import type { Board, GameState, Piece } from "../types.ts";
+import type { Board, Piece } from "../types.ts";
+import { makeTestState } from "./helpers.ts";
 
 function createEmptyBoard(size = 16): Board {
   return Array.from({ length: size }, () =>
@@ -152,18 +153,7 @@ describe("raycast", () => {
     board[8][7] = makePiece(2, 2);
     board[8][8] = makePiece(1, 1);
 
-    const state: GameState = {
-      board,
-      size: 16,
-      currentTurn: 1,
-      activePlayerId: 1,
-      players: [
-        { id: 1, teamId: 1, name: "Player 1" },
-        { id: 2, teamId: 2, name: "Player 2" },
-      ],
-      isGameOver: false,
-      winnerTeamId: null,
-    };
+    const state = makeTestState(board, 1);
 
     const legalMoves = getLegalMoves(state, 1, "NONE");
     expect(legalMoves.length).toBe(4);

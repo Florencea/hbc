@@ -1,13 +1,15 @@
 import { collectAllRaycasts, DIRECTIONS, isValidCoord } from "./raycast.ts";
-import type {
-  Action,
-  Board,
-  Coord,
-  GameEvent,
-  GameState,
-  Piece,
-  ResolutionResult,
-  SkillType,
+import {
+  SKILL_SPECS,
+  type Action,
+  type Board,
+  type Coord,
+  type GameEvent,
+  type GameState,
+  type Piece,
+  type Player,
+  type ResolutionResult,
+  type SkillType,
 } from "./types.ts";
 
 interface BombQueueItem {
@@ -15,13 +17,67 @@ interface BombQueueItem {
   teamId: number;
 }
 
+function createDefaultPlayer(id: number, teamId: number, name: string): Player {
+  return {
+    id,
+    teamId,
+    name,
+    hand: {
+      NONE: Infinity,
+      WALL: 0,
+      PIERCE: 0,
+      BOMB: 0,
+      PURIFY: 0,
+      COUNTER: 0,
+    },
+    charge: {
+      NONE: 0,
+      WALL: 0,
+      PIERCE: 0,
+      BOMB: 0,
+      PURIFY: 0,
+      COUNTER: 0,
+    },
+    isForcedSpecial: false,
+  };
+}
+
 export function createInitialState(
   size = 16,
-  players = [
-    { id: 1, teamId: 1, name: "Player 1" },
-    { id: 2, teamId: 2, name: "Player 2" },
-  ],
+  players?: (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[],
 ): GameState {
+  const initializedPlayers: Player[] = players
+    ? players.map((p) => ({
+        id: p.id,
+        teamId: p.teamId,
+        name: p.name,
+        hand: p.hand
+          ? { ...p.hand }
+          : {
+              NONE: Infinity,
+              WALL: 0,
+              PIERCE: 0,
+              BOMB: 0,
+              PURIFY: 0,
+              COUNTER: 0,
+            },
+        charge: p.charge
+          ? { ...p.charge }
+          : {
+              NONE: 0,
+              WALL: 0,
+              PIERCE: 0,
+              BOMB: 0,
+              PURIFY: 0,
+              COUNTER: 0,
+            },
+        isForcedSpecial: p.isForcedSpecial ?? false,
+      }))
+    : [
+        createDefaultPlayer(1, 1, "Player 1"),
+        createDefaultPlayer(2, 2, "Player 2"),
+      ];
+
   const board: Board = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => null),
   );
@@ -30,25 +86,25 @@ export function createInitialState(
   // Standard center 4 pieces
   board[mid - 1][mid - 1] = {
     teamId: 1,
-    playerId: players[0]?.id ?? 1,
+    playerId: initializedPlayers[0]?.id ?? 1,
     skillType: "NONE",
     isRevealed: true,
   };
   board[mid - 1][mid] = {
     teamId: 2,
-    playerId: players[1]?.id ?? 2,
+    playerId: initializedPlayers[1]?.id ?? 2,
     skillType: "NONE",
     isRevealed: true,
   };
   board[mid][mid - 1] = {
     teamId: 2,
-    playerId: players[1]?.id ?? 2,
+    playerId: initializedPlayers[1]?.id ?? 2,
     skillType: "NONE",
     isRevealed: true,
   };
   board[mid][mid] = {
     teamId: 1,
-    playerId: players[0]?.id ?? 1,
+    playerId: initializedPlayers[0]?.id ?? 1,
     skillType: "NONE",
     isRevealed: true,
   };
@@ -57,8 +113,8 @@ export function createInitialState(
     board,
     size,
     currentTurn: 1,
-    activePlayerId: players[0]?.id ?? 1,
-    players,
+    activePlayerId: initializedPlayers[0]?.id ?? 1,
+    players: initializedPlayers,
     isGameOver: false,
     winnerTeamId: null,
   };
@@ -66,6 +122,40 @@ export function createInitialState(
 
 function cloneBoard(board: Board): Board {
   return board.map((row) => row.map((piece) => (piece ? { ...piece } : null)));
+}
+
+function clonePlayers(players: Player[]): Player[] {
+  return players.map((p) => ({
+    ...p,
+    hand: { ...p.hand },
+    charge: { ...p.charge },
+  }));
+}
+
+function applyTurnEndUpkeep(player: Player, events: GameEvent[]): void {
+  const skillKeys = Object.keys(SKILL_SPECS) as (keyof typeof SKILL_SPECS)[];
+  for (const skill of skillKeys) {
+    player.charge[skill] += 1;
+    if (player.charge[skill] >= SKILL_SPECS[skill].cd) {
+      if (player.hand[skill] < SKILL_SPECS[skill].maxHand) {
+        player.hand[skill] += 1;
+        player.charge[skill] = 0;
+        events.push({
+          type: "SKILL_ACQUIRED",
+          playerId: player.id,
+          skillType: skill,
+          currentHandCount: player.hand[skill],
+        });
+      } else if (player.hand[skill] === SKILL_SPECS[skill].maxHand) {
+        player.isForcedSpecial = true;
+        player.charge[skill] = SKILL_SPECS[skill].cd;
+        events.push({
+          type: "FORCED_SPECIAL_TRIGGERED",
+          playerId: player.id,
+        });
+      }
+    }
+  }
 }
 
 export function dispatch(
@@ -78,6 +168,12 @@ export function dispatch(
 
   const events: GameEvent[] = [];
   const newBoard = cloneBoard(state.board);
+  const newPlayers = clonePlayers(state.players);
+
+  const attacker = newPlayers.find((p) => p.id === action.playerId);
+  if (!attacker) {
+    throw new Error("Player not found in state");
+  }
 
   if (action.type === "PASS_TURN") {
     if (action.playerId !== state.activePlayerId) {
@@ -87,9 +183,12 @@ export function dispatch(
     // Apply Purify pulses at turn end
     applyPurifyPulses(newBoard, state.size, events);
 
+    // Apply Turn-End Upkeep
+    applyTurnEndUpkeep(attacker, events);
+
     // Advance turn
-    const activeIdx = state.players.findIndex((p) => p.id === action.playerId);
-    const nextPlayer = state.players[(activeIdx + 1) % state.players.length];
+    const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
+    const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
 
     events.push({
       type: "TURN_CHANGED",
@@ -103,6 +202,7 @@ export function dispatch(
       board: newBoard,
       currentTurn: state.currentTurn + 1,
       activePlayerId: nextPlayer.id,
+      players: newPlayers,
     };
 
     return { nextState, events };
@@ -121,12 +221,21 @@ export function dispatch(
     throw new Error("Target coordinate is already occupied");
   }
 
-  const attacker = state.players.find((p) => p.id === action.playerId);
-  if (!attacker) {
-    throw new Error("Player not found in state");
+  const attackerSkill: SkillType = action.skillType ?? "NONE";
+
+  // Move Validation for skill economy:
+  if (action.skillType && action.skillType !== "NONE") {
+    if (attacker.hand[action.skillType] <= 0) {
+      throw new Error("Player does not have this skill in hand");
+    }
+    attacker.hand[action.skillType] -= 1;
+    attacker.isForcedSpecial = false;
   }
 
-  const attackerSkill: SkillType = action.skillType ?? "NONE";
+  if (attacker.isForcedSpecial && attackerSkill === "NONE") {
+    throw new Error("Forced special move required: hand cap reached");
+  }
+
   const isPurify = attackerSkill === "PURIFY";
 
   // 1. Place piece
@@ -458,9 +567,12 @@ export function dispatch(
   // 5. Apply turn-end PURIFY pulses
   applyPurifyPulses(newBoard, state.size, events);
 
+  // Turn-end upkeep: charges and skill acquisition for action.playerId
+  applyTurnEndUpkeep(attacker, events);
+
   // 6. Advance turn and check game over
-  const activeIdx = state.players.findIndex((p) => p.id === action.playerId);
-  const nextPlayer = state.players[(activeIdx + 1) % state.players.length];
+  const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
+  const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
 
   events.push({
     type: "TURN_CHANGED",
@@ -485,7 +597,7 @@ export function dispatch(
     size: state.size,
     currentTurn: state.currentTurn + 1,
     activePlayerId: nextPlayer.id,
-    players: state.players,
+    players: newPlayers,
     isGameOver,
     winnerTeamId,
   };

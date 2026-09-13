@@ -6,6 +6,17 @@ export interface Coord {
 export type SkillType =
   "NONE" | "WALL" | "PIERCE" | "BOMB" | "PURIFY" | "COUNTER";
 
+export const SKILL_SPECS: Record<
+  Exclude<SkillType, "NONE">,
+  { cd: number; maxHand: number }
+> = {
+  WALL: { cd: 3, maxHand: 2 },
+  PIERCE: { cd: 2, maxHand: 3 },
+  BOMB: { cd: 2, maxHand: 3 },
+  PURIFY: { cd: 4, maxHand: 2 },
+  COUNTER: { cd: 5, maxHand: 1 },
+};
+
 export interface Piece {
   teamId: number;
   playerId: number;
@@ -20,6 +31,9 @@ export interface Player {
   id: number;
   teamId: number;
   name: string;
+  hand: Record<SkillType, number>;
+  charge: Record<SkillType, number>;
+  isForcedSpecial: boolean;
 }
 
 export interface GameState {
@@ -111,6 +125,16 @@ export type GameEvent =
       previousPlayerId: number;
       nextPlayerId: number;
       turn: number;
+    }
+  | {
+      type: "SKILL_ACQUIRED";
+      playerId: number;
+      skillType: SkillType;
+      currentHandCount: number;
+    }
+  | {
+      type: "FORCED_SPECIAL_TRIGGERED";
+      playerId: number;
     }
   | {
       type: "GAME_OVER";

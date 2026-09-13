@@ -1,4 +1,9 @@
-import type { GameState, MaskedGameState, MaskedPiece } from "./types.ts";
+import type {
+  GameState,
+  MaskedGameState,
+  MaskedPiece,
+  Player,
+} from "./types.ts";
 
 export function sanitizeForViewer(
   state: GameState,
@@ -29,8 +34,42 @@ export function sanitizeForViewer(
     }),
   );
 
+  const maskedPlayers: Player[] = state.players.map((player) => {
+    // Teammates and the viewer can see full telemetry
+    if (player.teamId === viewerTeamId) {
+      return {
+        ...player,
+        hand: { ...player.hand },
+        charge: { ...player.charge },
+      };
+    }
+
+    // Opponents: sanitize hand, charge, and isForcedSpecial (mask numbers to 0 and flag to false)
+    return {
+      ...player,
+      hand: {
+        NONE: 0,
+        WALL: 0,
+        PIERCE: 0,
+        BOMB: 0,
+        PURIFY: 0,
+        COUNTER: 0,
+      },
+      charge: {
+        NONE: 0,
+        WALL: 0,
+        PIERCE: 0,
+        BOMB: 0,
+        PURIFY: 0,
+        COUNTER: 0,
+      },
+      isForcedSpecial: false,
+    };
+  });
+
   return {
     ...state,
     board: maskedBoard,
+    players: maskedPlayers,
   };
 }
