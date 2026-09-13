@@ -180,7 +180,7 @@ export function playBlockSound(): void {
 }
 
 /**
- * Deep ominous low-frequency bass swell.
+ * Deep ominous low-frequency bass swell and void snap for COUNTER.
  */
 export function playCounterSound(): void {
   if (isMuted) return;
@@ -191,22 +191,37 @@ export function playCounterSound(): void {
 
   const osc = ctx.createOscillator();
   osc.type = "sawtooth";
-  osc.frequency.setValueAtTime(60, now);
-  osc.frequency.exponentialRampToValueAtTime(36, now + 0.35);
+  osc.frequency.setValueAtTime(65, now);
+  osc.frequency.exponentialRampToValueAtTime(32, now + 0.45);
 
   const subOsc = ctx.createOscillator();
   subOsc.type = "sine";
-  subOsc.frequency.setValueAtTime(30, now);
+  subOsc.frequency.setValueAtTime(45, now);
+  subOsc.frequency.exponentialRampToValueAtTime(22, now + 0.5);
+
+  // Void snap noise burst
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx, 0.08);
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.setValueAtTime(1800, now);
+  noiseFilter.Q.setValueAtTime(5, now);
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.2, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
 
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.setValueAtTime(220, now);
-  filter.frequency.exponentialRampToValueAtTime(80, now + 0.35);
+  filter.frequency.setValueAtTime(260, now);
+  filter.frequency.exponentialRampToValueAtTime(60, now + 0.45);
 
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.01, now);
-  gain.gain.linearRampToValueAtTime(0.3, now + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  gain.gain.linearRampToValueAtTime(0.35, now + 0.06);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
 
   osc.connect(filter);
   subOsc.connect(filter);
@@ -215,12 +230,13 @@ export function playCounterSound(): void {
 
   osc.start(now);
   subOsc.start(now);
-  osc.stop(now + 0.36);
-  subOsc.stop(now + 0.36);
+  noise.start(now);
+  osc.stop(now + 0.5);
+  subOsc.stop(now + 0.5);
 }
 
 /**
- * Resonant distortion explosion tone.
+ * Resonant distortion explosion tone with layered thunder for BOMB.
  */
 export function playBombSound(): void {
   if (isMuted) return;
@@ -232,25 +248,25 @@ export function playBombSound(): void {
   // Low frequency sub pitch drop
   const osc = ctx.createOscillator();
   osc.type = "triangle";
-  osc.frequency.setValueAtTime(140, now);
-  osc.frequency.exponentialRampToValueAtTime(28, now + 0.3);
+  osc.frequency.setValueAtTime(160, now);
+  osc.frequency.exponentialRampToValueAtTime(24, now + 0.45);
 
   // Noise explosion body
   const noise = ctx.createBufferSource();
-  noise.buffer = createNoiseBuffer(ctx, 0.35);
+  noise.buffer = createNoiseBuffer(ctx, 0.5);
 
   const noiseFilter = ctx.createBiquadFilter();
   noiseFilter.type = "lowpass";
-  noiseFilter.frequency.setValueAtTime(700, now);
-  noiseFilter.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+  noiseFilter.frequency.setValueAtTime(900, now);
+  noiseFilter.frequency.exponentialRampToValueAtTime(45, now + 0.5);
 
   // Distortion waveshaper
   const shaper = ctx.createWaveShaper();
-  shaper.curve = createDistortionCurve(30);
+  shaper.curve = createDistortionCurve(35);
 
   const masterGain = ctx.createGain();
-  masterGain.gain.setValueAtTime(0.32, now);
-  masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  masterGain.gain.setValueAtTime(0.38, now);
+  masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
 
   osc.connect(shaper);
   noise.connect(noiseFilter);
@@ -260,11 +276,11 @@ export function playBombSound(): void {
 
   osc.start(now);
   noise.start(now);
-  osc.stop(now + 0.36);
+  osc.stop(now + 0.52);
 }
 
 /**
- * High-pitched harmonic chime.
+ * High-pitched harmonic celestial chimes for PURIFY.
  */
 export function playPurifySound(): void {
   if (isMuted) return;
@@ -273,12 +289,12 @@ export function playPurifySound(): void {
 
   const now = ctx.currentTime;
 
-  // Tri-tone harmonic frequencies: A5 (880Hz), E6 (1320Hz), A6 (1760Hz)
-  const freqs = [880, 1320, 1760];
+  // Tri-tone harmonic frequencies: A5 (880Hz), E6 (1320Hz), A6 (1760Hz), C#7 (2217Hz)
+  const freqs = [880, 1320, 1760, 2217];
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.01, now);
-  gain.gain.linearRampToValueAtTime(0.12, now + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+  gain.gain.linearRampToValueAtTime(0.14, now + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
   gain.connect(ctx.destination);
 
   for (const freq of freqs) {
@@ -287,8 +303,76 @@ export function playPurifySound(): void {
     osc.frequency.setValueAtTime(freq, now);
     osc.connect(gain);
     osc.start(now);
-    osc.stop(now + 0.46);
+    osc.stop(now + 0.62);
   }
+}
+
+/**
+ * Sharp crystalline astral penetration strike with celestial chime for PIERCE.
+ */
+export function playPierceSound(): void {
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+
+  // 1. Sharp penetrative downward slice (triangle drop)
+  const sliceOsc = ctx.createOscillator();
+  sliceOsc.type = "triangle";
+  sliceOsc.frequency.setValueAtTime(1600, now);
+  sliceOsc.frequency.exponentialRampToValueAtTime(360, now + 0.14);
+
+  const sliceGain = ctx.createGain();
+  sliceGain.gain.setValueAtTime(0.01, now);
+  sliceGain.gain.linearRampToValueAtTime(0.28, now + 0.01);
+  sliceGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  sliceOsc.connect(sliceGain);
+  sliceGain.connect(ctx.destination);
+
+  // 2. Air zip / sonic gust (bandpass noise sweep)
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx, 0.16);
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.setValueAtTime(3600, now);
+  noiseFilter.frequency.exponentialRampToValueAtTime(900, now + 0.14);
+  noiseFilter.Q.setValueAtTime(3.5, now);
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.18, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+
+  // 3. Ethereal soaring astral chime (E6 1318.5Hz + E7 2637Hz)
+  const chime1 = ctx.createOscillator();
+  chime1.type = "sine";
+  chime1.frequency.setValueAtTime(1318.5, now);
+
+  const chime2 = ctx.createOscillator();
+  chime2.type = "sine";
+  chime2.frequency.setValueAtTime(2637, now);
+
+  const chimeGain = ctx.createGain();
+  chimeGain.gain.setValueAtTime(0.01, now);
+  chimeGain.gain.linearRampToValueAtTime(0.16, now + 0.02);
+  chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+
+  chime1.connect(chimeGain);
+  chime2.connect(chimeGain);
+  chimeGain.connect(ctx.destination);
+
+  sliceOsc.start(now);
+  noise.start(now);
+  chime1.start(now);
+  chime2.start(now);
+
+  sliceOsc.stop(now + 0.2);
+  noise.stop(now + 0.2);
+  chime1.stop(now + 0.45);
+  chime2.stop(now + 0.45);
 }
 
 /**

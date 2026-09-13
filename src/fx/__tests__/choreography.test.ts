@@ -21,6 +21,9 @@ describe("event choreography", () => {
           `blocked:${wallCoord.x.toString()},${wallCoord.y.toString()}`,
         );
       },
+      onPierceTriggered: (coord) => {
+        callLog.push(`pierce:${coord.x.toString()},${coord.y.toString()}`);
+      },
       onPieceFlip: (coord, toTeamId) => {
         callLog.push(
           `flip:${coord.x.toString()},${coord.y.toString()}:${toTeamId.toString()}`,
@@ -145,10 +148,10 @@ describe("event choreography", () => {
       "reveal:5,7:WALL:BLOCK",
       "flip:5,6:1",
       "flip:6,6:1",
-      "flash:purple:250",
+      "flash:purple:350",
       "counter:6,6:reversed=1:team=2",
       "text:深淵復仇者 反擊！:6,6:counter",
-      "shake:200",
+      "shake:350",
       "bomb:4,4:blast=2:team=1",
       "text:殺戮盛宴 引爆！:4,4:bomb",
       "purify:7,7:affected=1:team=1",
@@ -159,13 +162,13 @@ describe("event choreography", () => {
     // Check delays
     expect(delays).toEqual([
       100, // PIECE_PLACED
-      250, // RAYCAST_BLOCKED
-      60, // FLIP_BATCH piece 1
-      60, // FLIP_BATCH piece 2
-      120, // COUNTER_TRIGGERED hitstop
-      150, // COUNTER_TRIGGERED post-counter
-      200, // BOMB_TRIGGERED shake/blast
-      250, // PURIFY_PULSE aura
+      500, // RAYCAST_BLOCKED
+      70, // FLIP_BATCH piece 1
+      70, // FLIP_BATCH piece 2
+      180, // COUNTER_TRIGGERED hitstop
+      520, // COUNTER_TRIGGERED post-counter
+      650, // BOMB_TRIGGERED shake/blast
+      650, // PURIFY_PULSE aura
       150, // PIONEER_PLACED
     ]);
   });
@@ -176,8 +179,11 @@ describe("event choreography", () => {
     expect(delayFn).not.toHaveBeenCalled();
   });
 
-  it("triggers floating combat text when PIERCE is revealed", async () => {
+  it("triggers floating combat text, onPierceTriggered, and sound when PIERCE is revealed", async () => {
     const texts: string[] = [];
+    const pierceCoords: string[] = [];
+    const delays: number[] = [];
+
     await playEvents(
       [
         {
@@ -193,9 +199,18 @@ describe("event choreography", () => {
             `${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`,
           );
         },
+        onPierceTriggered: (coord) => {
+          pierceCoords.push(`${coord.x.toString()},${coord.y.toString()}`);
+        },
+        delayFn: (ms) => {
+          delays.push(ms);
+          return Promise.resolve();
+        },
       },
     );
 
     expect(texts).toEqual(["天空守望者 貫穿！:3,3:pierce"]);
+    expect(pierceCoords).toEqual(["3,3"]);
+    expect(delays).toEqual([450]);
   });
 });

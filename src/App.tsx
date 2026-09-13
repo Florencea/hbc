@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   BoardOverlay,
+  type AbyssVortexEffect,
   type AuraPulseEffect,
   type BlastWaveEffect,
+  type PierceStrikeEffect,
   type PioneerBridgeEffect,
   type ShieldRippleEffect,
 } from "./components/BoardOverlay.tsx";
@@ -101,37 +103,56 @@ const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
   WALL: {
     label: "翡翠城壁 (綠)",
     annotationStyle:
-      "bg-slate-950/85 text-emerald-400 border border-emerald-500/50",
+      "bg-emerald-950/90 text-emerald-300 border border-emerald-400/80 shadow-[0_0_6px_rgba(52,211,153,0.7)]",
     buttonStyle: "bg-emerald-950/60 text-emerald-200 border-emerald-800/80",
     code: "壁",
   },
   PIERCE: {
     label: "天空守望者 (藍)",
-    annotationStyle: "bg-slate-950/85 text-cyan-300 border border-cyan-400/50",
+    annotationStyle:
+      "bg-sky-950/90 text-cyan-300 border border-cyan-400/80 shadow-[0_0_6px_rgba(56,189,248,0.7)]",
     buttonStyle: "bg-sky-950/60 text-sky-200 border-sky-800/80",
     code: "守",
   },
   BOMB: {
     label: "殺戮盛宴 (紅)",
-    annotationStyle: "bg-slate-950/85 text-rose-400 border border-rose-400/50",
+    annotationStyle:
+      "bg-rose-950/90 text-rose-200 border border-rose-400/80 shadow-[0_0_6px_rgba(244,63,94,0.7)]",
     buttonStyle: "bg-rose-950/60 text-rose-200 border-rose-800/80",
     code: "宴",
   },
   PURIFY: {
     label: "救贖之光 (黃)",
     annotationStyle:
-      "bg-slate-950/85 text-amber-400 border border-amber-400/50",
+      "bg-amber-950/90 text-amber-200 border border-amber-400/80 shadow-[0_0_6px_rgba(251,191,36,0.7)]",
     buttonStyle: "bg-amber-950/60 text-amber-200 border-amber-800/80",
     code: "光",
   },
   COUNTER: {
     label: "深淵復仇者 (黑)",
-    annotationStyle: "bg-black/90 text-purple-300 border border-purple-500/60",
+    annotationStyle:
+      "bg-slate-950/95 text-purple-300 border border-purple-400/80 shadow-[0_0_6px_rgba(168,85,247,0.7)]",
     buttonStyle:
       "bg-slate-950/90 text-purple-200 border-purple-900/80 hover:border-purple-600/80",
     code: "仇",
   },
 };
+
+function getSpecialPieceGlowClass(piece: Piece | MaskedPiece): string {
+  if (!piece.isRevealed || piece.skillType === "NONE") return "";
+  switch (piece.skillType) {
+    case "WALL":
+      return "ring-1 ring-emerald-400/90 shadow-[0_0_8px_rgba(52,211,153,0.6)]";
+    case "PIERCE":
+      return "ring-1 ring-cyan-400/90 shadow-[0_0_8px_rgba(56,189,248,0.6)]";
+    case "BOMB":
+      return "ring-1 ring-rose-500/90 shadow-[0_0_8px_rgba(244,63,94,0.65)]";
+    case "PURIFY":
+      return "ring-1 ring-amber-400/90 shadow-[0_0_8px_rgba(251,191,36,0.7)]";
+    case "COUNTER":
+      return "ring-1 ring-purple-500/90 shadow-[0_0_8px_rgba(168,85,247,0.7)]";
+  }
+}
 
 const SKILL_OPTIONS: { type: SkillType; label: string }[] = [
   { type: "NONE", label: "常規棋" },
@@ -457,6 +478,8 @@ export default function App() {
   const [blastWaves, setBlastWaves] = useState<BlastWaveEffect[]>([]);
   const [auraPulses, setAuraPulses] = useState<AuraPulseEffect[]>([]);
   const [shieldRipples, setShieldRipples] = useState<ShieldRippleEffect[]>([]);
+  const [pierceStrikes, setPierceStrikes] = useState<PierceStrikeEffect[]>([]);
+  const [abyssVortices, setAbyssVortices] = useState<AbyssVortexEffect[]>([]);
   const [pioneerBridges, setPioneerBridges] = useState<PioneerBridgeEffect[]>(
     [],
   );
@@ -718,7 +741,14 @@ export default function App() {
             ]);
             setTimeout(() => {
               setShieldRipples((prev) => prev.filter((r) => r.id !== rippleId));
-            }, 500);
+            }, 600);
+          },
+          onPierceTriggered: (pos) => {
+            const strikeId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setPierceStrikes((prev) => [...prev, { id: strikeId, coord: pos }]);
+            setTimeout(() => {
+              setPierceStrikes((prev) => prev.filter((p) => p.id !== strikeId));
+            }, 600);
           },
           onCounterTriggered: (center, reversedCoords, defenderTeamId) => {
             const reversedSet = new Set(
@@ -748,6 +778,15 @@ export default function App() {
               }),
             );
             setIntermediateBoard(currentIntermediateBoard);
+
+            const vortexId = `${Date.now().toString()}-${Math.random().toString()}`;
+            setAbyssVortices((prev) => [
+              ...prev,
+              { id: vortexId, center, reversedCoords },
+            ]);
+            setTimeout(() => {
+              setAbyssVortices((prev) => prev.filter((v) => v.id !== vortexId));
+            }, 750);
           },
           onBombTriggered: (center, blastCoords, teamId) => {
             const blastSet = new Set(
@@ -777,7 +816,7 @@ export default function App() {
             setBlastWaves((prev) => [...prev, { id: blastId, center }]);
             setTimeout(() => {
               setBlastWaves((prev) => prev.filter((b) => b.id !== blastId));
-            }, 500);
+            }, 700);
           },
           onPurifyPulse: (center, affectedCoords, teamId) => {
             const affectedSet = new Set(
@@ -809,7 +848,7 @@ export default function App() {
             setAuraPulses((prev) => [...prev, { id: auraId, center }]);
             setTimeout(() => {
               setAuraPulses((prev) => prev.filter((a) => a.id !== auraId));
-            }, 600);
+            }, 750);
           },
           onAddFloatingText: (text, pos, variant) => {
             const textId = `${Date.now().toString()}-${Math.random().toString()}`;
@@ -819,15 +858,15 @@ export default function App() {
             ]);
             setTimeout(() => {
               setFloatingTexts((prev) => prev.filter((t) => t.id !== textId));
-            }, 850);
+            }, 1250);
           },
-          onTriggerScreenShake: (durationMs = 200) => {
+          onTriggerScreenShake: (durationMs = 350) => {
             setIsScreenShaking(true);
             setTimeout(() => {
               setIsScreenShaking(false);
             }, durationMs);
           },
-          onTriggerScreenFlash: (color = "purple", durationMs = 250) => {
+          onTriggerScreenFlash: (color = "purple", durationMs = 350) => {
             setScreenFlash(color);
             setTimeout(() => {
               setScreenFlash(null);
@@ -1552,202 +1591,211 @@ export default function App() {
           </div>
 
           <div
-            className={`relative rounded-xl border border-emerald-900/60 bg-emerald-950/70 p-3 shadow-2xl transition-transform ${
+            className={`flex justify-center rounded-xl border border-emerald-900/60 bg-emerald-950/70 p-3 shadow-2xl transition-transform ${
               isScreenShaking ? "animate-board-shake" : ""
             }`}
           >
-            {/* Visual FX Overlays */}
-            <BoardOverlay
-              boardSize={gameState.size}
-              blastWaves={blastWaves}
-              auraPulses={auraPulses}
-              shieldRipples={shieldRipples}
-              pioneerBridges={pioneerBridges}
-            />
-            <FloatingCombatText
-              items={floatingTexts}
-              boardSize={gameState.size}
-            />
+            <div className="relative">
+              {/* Visual FX Overlays strictly aligned to board grid */}
+              <BoardOverlay
+                boardSize={gameState.size}
+                blastWaves={blastWaves}
+                auraPulses={auraPulses}
+                shieldRipples={shieldRipples}
+                pierceStrikes={pierceStrikes}
+                abyssVortices={abyssVortices}
+                pioneerBridges={pioneerBridges}
+              />
+              <FloatingCombatText
+                items={floatingTexts}
+                boardSize={gameState.size}
+              />
 
-            <div
-              className="grid gap-0.5 rounded bg-emerald-950 p-0.5"
-              style={{
-                gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
-              }}
-              onMouseLeave={() => {
-                setHoveredCoord(null);
-              }}
-            >
-              {currentBoard.map((row, y) =>
-                row.map((piece, x) => {
-                  const key = `${x.toString()},${y.toString()}`;
-                  const isStandardLegal = standardMoveSet.has(key);
-                  const isPioneerLegal = pioneerMoveSet.has(key);
-                  const isLegal = isStandardLegal || isPioneerLegal;
-                  const effectiveDropZone =
-                    gameMode === "PVE"
-                      ? gameState.players.find((p) => p.teamId === 1)?.dropZone
-                      : activePlayer?.dropZone;
-                  const inDropZone =
-                    gameState.isDropPhase &&
-                    effectiveDropZone &&
-                    isWithinDropZone({ x, y }, effectiveDropZone);
-                  const isFlipping = flippingCoords.has(key);
-                  const isPopping =
-                    poppingCoord?.x === x && poppingCoord.y === y;
+              <div
+                className="grid gap-0.5 rounded bg-emerald-950 p-0.5"
+                style={{
+                  gridTemplateColumns: `repeat(${gameState.size.toString()}, minmax(0, 1fr))`,
+                }}
+                onMouseLeave={() => {
+                  setHoveredCoord(null);
+                }}
+              >
+                {currentBoard.map((row, y) =>
+                  row.map((piece, x) => {
+                    const key = `${x.toString()},${y.toString()}`;
+                    const isStandardLegal = standardMoveSet.has(key);
+                    const isPioneerLegal = pioneerMoveSet.has(key);
+                    const isLegal = isStandardLegal || isPioneerLegal;
+                    const effectiveDropZone =
+                      gameMode === "PVE"
+                        ? gameState.players.find((p) => p.teamId === 1)
+                            ?.dropZone
+                        : activePlayer?.dropZone;
+                    const inDropZone =
+                      gameState.isDropPhase &&
+                      effectiveDropZone &&
+                      isWithinDropZone({ x, y }, effectiveDropZone);
+                    const isFlipping = flippingCoords.has(key);
+                    const isPopping =
+                      poppingCoord?.x === x && poppingCoord.y === y;
 
-                  const isHovered =
-                    hoveredCoord?.x === x && hoveredCoord.y === y;
-                  const isPreviewPlacement =
-                    !isAnimating &&
-                    piece === null &&
-                    isHovered &&
-                    isStandardLegal;
-                  const isPreviewFlipped =
-                    !isAnimating && previewCapturedSet.has(key);
+                    const isHovered =
+                      hoveredCoord?.x === x && hoveredCoord.y === y;
+                    const isPreviewPlacement =
+                      !isAnimating &&
+                      piece === null &&
+                      isHovered &&
+                      isStandardLegal;
+                    const isPreviewFlipped =
+                      !isAnimating && previewCapturedSet.has(key);
 
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onMouseEnter={() => {
-                        if (
-                          !isAnimating &&
-                          !isCurrentPlayerAi &&
-                          isStandardLegal
-                        ) {
-                          setHoveredCoord({ x, y });
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        if (hoveredCoord?.x === x && hoveredCoord.y === y) {
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onMouseEnter={() => {
+                          if (
+                            !isAnimating &&
+                            !isCurrentPlayerAi &&
+                            isStandardLegal
+                          ) {
+                            setHoveredCoord({ x, y });
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          if (hoveredCoord?.x === x && hoveredCoord.y === y) {
+                            setHoveredCoord(null);
+                          }
+                        }}
+                        onClick={() => {
                           setHoveredCoord(null);
+                          handleCellClick({ x, y });
+                        }}
+                        disabled={
+                          isAnimating ||
+                          gameState.isGameOver ||
+                          (gameMode === "PVE" &&
+                            gameState.activePlayerId === 2) ||
+                          (piece !== null && !isLegal)
                         }
-                      }}
-                      onClick={() => {
-                        setHoveredCoord(null);
-                        handleCellClick({ x, y });
-                      }}
-                      disabled={
-                        isAnimating ||
-                        gameState.isGameOver ||
-                        (gameMode === "PVE" &&
-                          gameState.activePlayerId === 2) ||
-                        (piece !== null && !isLegal)
-                      }
-                      className={`relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
-                        (x + y) % 2 === 0
-                          ? "bg-emerald-900/90"
-                          : "bg-emerald-800/80"
-                      } ${
-                        gameState.isDropPhase
-                          ? inDropZone
-                            ? (gameMode === "PVE"
-                                ? 1
-                                : (activePlayer?.teamId ?? 1)) === 1
-                              ? "bg-emerald-800/90 ring-2 ring-zinc-300/80 ring-inset"
-                              : "bg-emerald-800/90 ring-2 ring-white/90 ring-inset"
-                            : "opacity-45"
-                          : ""
-                      } ${
-                        isAnimating
-                          ? "cursor-not-allowed"
-                          : isLegal
-                            ? activePlayer?.teamId === 1
-                              ? "cursor-pointer hover:bg-emerald-700/90 hover:ring-1 hover:ring-zinc-300/80"
-                              : "cursor-pointer hover:bg-emerald-700/90 hover:ring-1 hover:ring-white/90"
-                            : "hover:bg-emerald-800/50"
-                      }`}
-                    >
-                      {/* Legal Move Marker matching active team color (hidden during preview ghost piece) */}
-                      {piece === null &&
-                        !isAnimating &&
-                        isStandardLegal &&
-                        !isPreviewPlacement && (
+                        className={`relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8 ${
+                          (x + y) % 2 === 0
+                            ? "bg-emerald-900/90"
+                            : "bg-emerald-800/80"
+                        } ${
+                          gameState.isDropPhase
+                            ? inDropZone
+                              ? (gameMode === "PVE"
+                                  ? 1
+                                  : (activePlayer?.teamId ?? 1)) === 1
+                                ? "bg-emerald-800/90 ring-2 ring-zinc-300/80 ring-inset"
+                                : "bg-emerald-800/90 ring-2 ring-white/90 ring-inset"
+                              : "opacity-45"
+                            : ""
+                        } ${
+                          isAnimating
+                            ? "cursor-not-allowed"
+                            : isLegal
+                              ? activePlayer?.teamId === 1
+                                ? "cursor-pointer hover:bg-emerald-700/90 hover:ring-1 hover:ring-zinc-300/80"
+                                : "cursor-pointer hover:bg-emerald-700/90 hover:ring-1 hover:ring-white/90"
+                              : "hover:bg-emerald-800/50"
+                        }`}
+                      >
+                        {/* Legal Move Marker matching active team color (hidden during preview ghost piece) */}
+                        {piece === null &&
+                          !isAnimating &&
+                          isStandardLegal &&
+                          !isPreviewPlacement && (
+                            <span
+                              className={getLegalMarkerClass(
+                                activePlayer?.teamId ?? 1,
+                                false,
+                              )}
+                            />
+                          )}
+                        {piece === null && !isAnimating && isPioneerLegal && (
                           <span
                             className={getLegalMarkerClass(
                               activePlayer?.teamId ?? 1,
-                              false,
+                              true,
                             )}
                           />
                         )}
-                      {piece === null && !isAnimating && isPioneerLegal && (
-                        <span
-                          className={getLegalMarkerClass(
-                            activePlayer?.teamId ?? 1,
-                            true,
-                          )}
-                        />
-                      )}
 
-                      {/* Hover Preview Ghost Piece */}
-                      {isPreviewPlacement && (
-                        <div
-                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border border-dashed shadow-xs transition-all sm:h-6 sm:w-6 md:h-7 md:w-7 ${
-                            activePlayer?.teamId === 1
-                              ? "border-zinc-400/80 bg-zinc-950/60 text-zinc-100 ring-2 ring-zinc-500/70"
-                              : "border-zinc-200/80 bg-white/70 text-zinc-900 ring-2 ring-white/70"
-                          }`}
-                        >
-                          <span className="text-[9px] font-black opacity-90 sm:text-[10px]">
-                            +
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Piece Representation (including Preview Flipped State) */}
-                      {piece && (
-                        <div
-                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${
-                            isPreviewFlipped
-                              ? `${getTeamColorClass(
-                                  activePlayer?.teamId ?? 1,
-                                )} scale-95 shadow-md ring-2 ring-amber-300`
-                              : getTeamColorClass(piece.teamId)
-                          } ${
-                            !piece.isRevealed &&
-                            !isPreviewFlipped &&
-                            piece.teamId === viewerTeamId
-                              ? "border-dashed ring-1 ring-slate-400/50"
-                              : ""
-                          } ${
-                            piece.skillType === "PURIFY" &&
-                            piece.duration !== undefined
-                              ? "shadow-xs ring-1 shadow-amber-500/30 ring-amber-400/80"
-                              : ""
-                          } ${isFlipping ? "animate-piece-flip" : ""} ${
-                            isPopping ? "animate-piece-pop" : ""
-                          }`}
-                        >
-                          {isPreviewFlipped ? null : piece.teamId === 0 ? (
-                            <span className="text-[10px] sm:text-xs">⚓</span>
-                          ) : SKILL_CONFIG[piece.skillType].code ? (
-                            <span
-                              className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-black sm:h-4 sm:w-4 sm:text-[10px] ${
-                                SKILL_CONFIG[piece.skillType].annotationStyle
-                              }`}
-                            >
-                              {SKILL_CONFIG[piece.skillType].code}
+                        {/* Hover Preview Ghost Piece */}
+                        {isPreviewPlacement && (
+                          <div
+                            className={`relative flex h-5 w-5 items-center justify-center rounded-full border border-dashed shadow-xs transition-all sm:h-6 sm:w-6 md:h-7 md:w-7 ${
+                              activePlayer?.teamId === 1
+                                ? "border-zinc-400/80 bg-zinc-950/60 text-zinc-100 ring-2 ring-zinc-500/70"
+                                : "border-zinc-200/80 bg-white/70 text-zinc-900 ring-2 ring-white/70"
+                            }`}
+                          >
+                            <span className="text-[9px] font-black opacity-90 sm:text-[10px]">
+                              +
                             </span>
-                          ) : null}
+                          </div>
+                        )}
 
-                          {/* Revealed PURIFY Remaining Duration Marker */}
-                          {!isPreviewFlipped &&
-                            piece.skillType === "PURIFY" &&
-                            piece.duration !== undefined && (
+                        {/* Piece Representation (including Preview Flipped State) */}
+                        {piece && (
+                          <div
+                            className={`relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7 ${
+                              isPreviewFlipped
+                                ? `${getTeamColorClass(
+                                    activePlayer?.teamId ?? 1,
+                                  )} scale-95 shadow-md ring-2 ring-amber-300`
+                                : getTeamColorClass(piece.teamId)
+                            } ${
+                              !piece.isRevealed &&
+                              !isPreviewFlipped &&
+                              piece.teamId === viewerTeamId
+                                ? "border-dashed ring-1 ring-slate-400/50"
+                                : ""
+                            } ${
+                              !isPreviewFlipped
+                                ? getSpecialPieceGlowClass(piece)
+                                : ""
+                            } ${
+                              piece.skillType === "PURIFY" &&
+                              piece.duration !== undefined
+                                ? "shadow-xs ring-1 shadow-amber-500/30 ring-amber-400/80"
+                                : ""
+                            } ${isFlipping ? "animate-piece-flip" : ""} ${
+                              isPopping ? "animate-piece-pop" : ""
+                            }`}
+                          >
+                            {isPreviewFlipped ? null : piece.teamId === 0 ? (
+                              <span className="text-[10px] sm:text-xs">⚓</span>
+                            ) : SKILL_CONFIG[piece.skillType].code ? (
                               <span
-                                title={`救贖之光：淨化光環生效中（剩餘 ${piece.duration.toString()} 回合）`}
-                                className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-amber-300 bg-amber-400 text-[8px] font-black text-slate-950 shadow-md ring-1 ring-slate-950 sm:h-4 sm:w-4 sm:text-[9px]"
+                                className={`flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-black sm:h-4 sm:w-4 sm:text-[10px] ${
+                                  SKILL_CONFIG[piece.skillType].annotationStyle
+                                }`}
                               >
-                                {piece.duration.toString()}
+                                {SKILL_CONFIG[piece.skillType].code}
                               </span>
-                            )}
-                        </div>
-                      )}
-                    </button>
-                  );
-                }),
-              )}
+                            ) : null}
+
+                            {/* Revealed PURIFY Remaining Duration Marker */}
+                            {!isPreviewFlipped &&
+                              piece.skillType === "PURIFY" &&
+                              piece.duration !== undefined && (
+                                <span
+                                  title={`救贖之光：淨化光環生效中（剩餘 ${piece.duration.toString()} 回合）`}
+                                  className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-amber-300 bg-amber-400 text-[8px] font-black text-slate-950 shadow-md ring-1 ring-slate-950 sm:h-4 sm:w-4 sm:text-[9px]"
+                                >
+                                  {piece.duration.toString()}
+                                </span>
+                              )}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  }),
+                )}
+              </div>
             </div>
           </div>
         </section>

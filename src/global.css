@@ -3,15 +3,39 @@
 @theme {
   --color-board-bg: #1e293b;
   --color-board-grid: #334155;
-  --animate-board-shake: boardShake 0.2s cubic-bezier(0.36, 0.07, 0.19, 0.97)
+  --animate-board-shake: boardShake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97)
     both;
   --animate-piece-flip: pieceFlip 0.35s ease-in-out both;
   --animate-piece-pop: piecePop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)
     both;
-  --animate-shield-ripple: shieldRipple 0.5s ease-out forwards;
-  --animate-float-combat: floatCombat 0.8s ease-out forwards;
-  --animate-blast-wave: blastWave 0.5s ease-out forwards;
-  --animate-aura-pulse: auraPulse 0.6s ease-out forwards;
+  --animate-float-combat: floatCombat 1.2s cubic-bezier(0.16, 1, 0.3, 1)
+    forwards;
+
+  /* Skill 1: WALL (Emerald Hexagonal Shield) */
+  --animate-hex-shield: hexShield 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-shield-spark: shieldSpark 0.5s ease-out forwards;
+  --animate-shield-ripple: shieldRipple 0.55s ease-out forwards;
+
+  /* Skill 2: PIERCE (Sky Lance & Sonic Boom Ring) */
+  --animate-pierce-lance: pierceLance 0.5s cubic-bezier(0.16, 1, 0.3, 1)
+    forwards;
+  --animate-pierce-ring: pierceRing 0.5s ease-out forwards;
+
+  /* Skill 3: BOMB (Incandescent Core & Fiery 3x3 Blast) */
+  --animate-bomb-core: bombCore 0.65s ease-out forwards;
+  --animate-bomb-shock: bombShock 0.65s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+  --animate-blast-wave: blastWave 0.65s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+
+  /* Skill 4: PURIFY (Sacred Golden Mandala & Ascending Stardust) */
+  --animate-purify-mandala: purifyMandala 0.7s cubic-bezier(0.16, 1, 0.3, 1)
+    forwards;
+  --animate-purify-sparkle: purifySparkle 0.7s ease-out forwards;
+  --animate-aura-pulse: auraPulse 0.7s ease-out forwards;
+
+  /* Skill 5: COUNTER (Abyssal Singularity & Reversal Lightning) */
+  --animate-abyss-singularity: abyssSingularity 0.7s
+    cubic-bezier(0.7, 0, 0.3, 1) forwards;
+  --animate-abyss-lightning: abyssLightning 0.55s ease-out forwards;
 }
 
 @keyframes boardShake {
@@ -19,20 +43,23 @@
   100% {
     transform: translate(0, 0);
   }
-  15% {
-    transform: translate(-5px, 3px);
+  12% {
+    transform: translate(-6px, 4px) rotate(-0.5deg);
   }
-  30% {
-    transform: translate(5px, -4px);
+  24% {
+    transform: translate(6px, -5px) rotate(0.5deg);
   }
-  45% {
-    transform: translate(-4px, 4px);
+  38% {
+    transform: translate(-5px, 5px) rotate(-0.3deg);
   }
-  60% {
-    transform: translate(4px, -2px);
+  52% {
+    transform: translate(5px, -3px) rotate(0.3deg);
   }
-  75% {
-    transform: translate(-2px, 2px);
+  68% {
+    transform: translate(-3px, 3px);
+  }
+  84% {
+    transform: translate(2px, -1px);
   }
 }
 
@@ -63,9 +90,62 @@
   }
 }
 
+@keyframes floatCombat {
+  0% {
+    transform: translate(-50%, 0) scale(0.7);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -8px) scale(1.1);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -24px) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -42px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* WALL: Hexagonal Shield and Deflection */
+@keyframes hexShield {
+  0% {
+    transform: scale(0.2) rotate(-15deg);
+    opacity: 0;
+  }
+  25% {
+    transform: scale(1.15) rotate(5deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(52, 211, 153, 0.95));
+  }
+  60% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.7));
+  }
+  100% {
+    transform: scale(1.35) rotate(10deg);
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(52, 211, 153, 0));
+  }
+}
+
+@keyframes shieldSpark {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
 @keyframes shieldRipple {
   0% {
-    transform: scale(0.7);
+    transform: scale(0.6);
     opacity: 1;
   }
   50% {
@@ -77,50 +157,190 @@
   }
 }
 
-@keyframes floatCombat {
+/* PIERCE: Supersonic lance penetration and sonic rings */
+@keyframes pierceLance {
   0% {
-    transform: translate(-50%, 0) scale(0.75);
+    transform: scale(0.2) rotate(45deg);
     opacity: 0;
   }
-  20% {
-    transform: translate(-50%, -6px) scale(1.08);
+  25% {
+    transform: scale(1.25) rotate(45deg);
     opacity: 1;
+    filter: drop-shadow(0 0 20px rgba(56, 189, 248, 1));
   }
-  75% {
-    transform: translate(-50%, -24px) scale(1);
-    opacity: 0.95;
+  70% {
+    transform: scale(1.05) rotate(45deg);
+    opacity: 0.9;
   }
   100% {
-    transform: translate(-50%, -36px) scale(0.95);
+    transform: scale(1.8) rotate(45deg);
     opacity: 0;
+  }
+}
+
+@keyframes pierceRing {
+  0% {
+    transform: scale(0.15);
+    opacity: 1;
+    border-width: 4px;
+  }
+  50% {
+    opacity: 0.85;
+    border-width: 2.5px;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* BOMB: Incandescent core flash & explosive shockwave */
+@keyframes bombCore {
+  0% {
+    transform: scale(0.15);
+    opacity: 1;
+    filter: brightness(3);
+  }
+  20% {
+    transform: scale(1.15);
+    opacity: 1;
+    filter: brightness(2.2);
+  }
+  55% {
+    transform: scale(0.9);
+    opacity: 0.85;
+    filter: brightness(1.2);
+  }
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes bombShock {
+  0% {
+    transform: scale(0.15);
+    opacity: 1;
+    border-width: 5px;
+  }
+  30% {
+    opacity: 0.95;
+    border-width: 3.5px;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+    border-width: 1px;
   }
 }
 
 @keyframes blastWave {
   0% {
-    transform: scale(0.2);
-    opacity: 0.9;
+    transform: scale(0.15);
+    opacity: 0.95;
   }
-  60% {
-    opacity: 0.7;
+  50% {
+    opacity: 0.85;
   }
   100% {
-    transform: scale(1);
+    transform: scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* PURIFY: Golden Sacred Mandala & Ascending Stardust */
+@keyframes purifyMandala {
+  0% {
+    transform: scale(0.2) rotate(0deg);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.05) rotate(90deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.95));
+  }
+  70% {
+    transform: scale(1) rotate(160deg);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.6));
+  }
+  100% {
+    transform: scale(1.15) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+@keyframes purifySparkle {
+  0% {
+    transform: translateY(0) scale(0.4);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-26px) scale(1.1);
     opacity: 0;
   }
 }
 
 @keyframes auraPulse {
   0% {
-    transform: scale(0.3);
-    opacity: 0.9;
+    transform: scale(0.25);
+    opacity: 0.95;
   }
   50% {
     transform: scale(1.05);
-    opacity: 0.7;
+    opacity: 0.75;
   }
   100% {
-    transform: scale(1);
+    transform: scale(1.15);
     opacity: 0;
+  }
+}
+
+/* COUNTER: Abyssal Singularity & Reversal Lightning */
+@keyframes abyssSingularity {
+  0% {
+    transform: scale(1.5) rotate(0deg);
+    opacity: 0;
+    filter: contrast(1.8) drop-shadow(0 0 25px rgba(168, 85, 247, 0.9));
+  }
+  25% {
+    transform: scale(0.4) rotate(-180deg);
+    opacity: 1;
+    filter: contrast(2.2);
+  }
+  45% {
+    transform: scale(0.35) rotate(-220deg);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.4) rotate(-360deg);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 35px rgba(147, 51, 234, 1));
+  }
+  100% {
+    transform: scale(1.9) rotate(-420deg);
+    opacity: 0;
+  }
+}
+
+@keyframes abyssLightning {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 120;
+  }
+  20% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  65% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -120;
   }
 }

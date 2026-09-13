@@ -16,15 +16,15 @@ interface FloatingCombatTextProps {
 function getVariantBadgeClass(variant: CombatTextVariant): string {
   switch (variant) {
     case "blocked":
-      return "border-emerald-500/80 bg-slate-950/95 text-emerald-300 shadow-emerald-950/50 ring-1 ring-emerald-400/40";
+      return "border-emerald-400/90 bg-slate-950/95 text-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.6)] ring-1 ring-emerald-400/50";
     case "counter":
-      return "border-purple-500/80 bg-purple-950/95 text-purple-200 shadow-purple-950/60 ring-1 ring-purple-400/50";
+      return "border-purple-400/90 bg-purple-950/95 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.7)] ring-1 ring-purple-400/60";
     case "bomb":
-      return "border-rose-500/80 bg-rose-950/95 text-rose-200 shadow-rose-950/60 ring-1 ring-rose-400/50";
+      return "border-rose-400/90 bg-rose-950/95 text-rose-200 shadow-[0_0_18px_rgba(244,63,94,0.75)] ring-1 ring-rose-400/60";
     case "purify":
-      return "border-amber-400/80 bg-amber-950/95 text-amber-200 shadow-amber-950/60 ring-1 ring-amber-400/50";
+      return "border-amber-300/95 bg-amber-950/95 text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.75)] ring-1 ring-amber-300/60";
     case "pierce":
-      return "border-cyan-400/80 bg-cyan-950/95 text-cyan-200 shadow-cyan-950/60 ring-1 ring-cyan-400/50";
+      return "border-cyan-300/95 bg-cyan-950/95 text-cyan-200 shadow-[0_0_18px_rgba(56,189,248,0.75)] ring-1 ring-cyan-300/60";
   }
 }
 

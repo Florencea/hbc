@@ -4,6 +4,7 @@ import {
   playBombSound,
   playCounterSound,
   playFlipSound,
+  playPierceSound,
   playPlaceSound,
   playPurifySound,
   playGameOverSound,
@@ -16,6 +17,7 @@ export interface EventHandlers {
   onPiecePlaced?: (coord: Coord, piece: Piece) => void;
   onPioneerPlaced?: (coord: Coord, piece: Piece) => void;
   onRaycastBlocked?: (wallCoord: Coord) => void;
+  onPierceTriggered?: (coord: Coord) => void;
   onPieceFlip?: (coord: Coord, toTeamId: number) => void;
   onCounterTriggered?: (
     center: Coord,
@@ -84,18 +86,21 @@ export async function playEvents(
         handlers.onRaycastBlocked?.(wallCoord);
         handlers.onAddFloatingText?.("翡翠城壁 格擋！", wallCoord, "blocked");
         playBlockSound();
-        await delay(250);
+        await delay(500);
         break;
       }
 
       case "PIECE_REVEALED": {
         handlers.onPieceRevealed?.(event.coord, event.skillType, event.reason);
         if (event.skillType === "PIERCE") {
+          handlers.onPierceTriggered?.(event.coord);
           handlers.onAddFloatingText?.(
             "天空守望者 貫穿！",
             event.coord,
             "pierce",
           );
+          playPierceSound();
+          await delay(450);
         }
         break;
       }
@@ -104,14 +109,14 @@ export async function playEvents(
         for (const coord of event.coords) {
           handlers.onPieceFlip?.(coord, event.toTeamId);
           playFlipSound();
-          await delay(60);
+          await delay(70);
         }
         break;
       }
 
       case "COUNTER_TRIGGERED": {
-        handlers.onTriggerScreenFlash?.("purple", 250);
-        await delay(120); // Hitstop
+        handlers.onTriggerScreenFlash?.("purple", 350);
+        await delay(180); // Hitstop
 
         handlers.onCounterTriggered?.(
           event.coord,
@@ -124,12 +129,12 @@ export async function playEvents(
           "counter",
         );
         playCounterSound();
-        await delay(150);
+        await delay(520);
         break;
       }
 
       case "BOMB_TRIGGERED": {
-        handlers.onTriggerScreenShake?.(200);
+        handlers.onTriggerScreenShake?.(350);
         handlers.onBombTriggered?.(
           event.coord,
           event.blastCoords,
@@ -137,7 +142,7 @@ export async function playEvents(
         );
         handlers.onAddFloatingText?.("殺戮盛宴 引爆！", event.coord, "bomb");
         playBombSound();
-        await delay(200);
+        await delay(650);
         break;
       }
 
@@ -149,7 +154,7 @@ export async function playEvents(
         );
         handlers.onAddFloatingText?.("救贖之光 淨化！", event.coord, "purify");
         playPurifySound();
-        await delay(250);
+        await delay(650);
         break;
       }
 

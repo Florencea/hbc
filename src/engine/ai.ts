@@ -223,14 +223,25 @@ export function selectBestMove(
 
       // Skill-specific preference heuristics
       if (skill === "WALL") {
-        if (isEdgeCoord(sanitized.size, coord)) score += 20;
-        if (isChokePoint(sanitized.board, sanitized.size, coord)) score += 25;
+        if (posWeight >= 100) {
+          // Impregnable corner wall
+          score += 45;
+        } else if (isEdgeCoord(sanitized.size, coord)) {
+          score += 25;
+        }
+        if (isChokePoint(sanitized.board, sanitized.size, coord)) {
+          score += 25;
+        }
       } else if (skill === "PIERCE") {
         const penetratesWall = raycasts.some(
           (r) => r.penetratedWallCoords.length > 0,
         );
         if (penetratesWall) {
-          score += 35;
+          score += 45;
+        } else if (captureCount >= 5) {
+          score += 25;
+        } else if (player.isForcedSpecial) {
+          score += 15;
         }
       } else if (skill === "BOMB") {
         const clusterCount = countEnemyOrNeutralIn3x3(
@@ -239,18 +250,42 @@ export function selectBestMove(
           coord,
           player.teamId,
         );
-        if (clusterCount >= 3) {
-          score += 25 + clusterCount * 5;
+        // BOMB is a dangerous double-edged trap; only prioritize when deeply surrounded
+        if (clusterCount >= 6) {
+          score += 20;
+        } else if (clusterCount >= 5 && player.isForcedSpecial) {
+          score += 18;
+        } else if (player.isForcedSpecial) {
+          score += 10;
         }
       } else if (skill === "COUNTER") {
-        if (posWeight >= 0) score += 15;
+        if (posWeight < 0) {
+          // Bait trap on C-squares / X-squares to punish opponent capture
+          score += 40;
+        } else if (captureCount >= 3) {
+          score += 25;
+        } else if (player.isForcedSpecial) {
+          score += 15;
+        }
       } else if (skill === "PURIFY") {
-        score += 15;
+        const clusterCount = countEnemyOrNeutralIn3x3(
+          sanitized.board,
+          sanitized.size,
+          coord,
+          player.teamId,
+        );
+        if (clusterCount >= 4) {
+          score += 30;
+        } else if (clusterCount >= 2 && player.isForcedSpecial) {
+          score += 20;
+        } else if (player.isForcedSpecial) {
+          score += 15;
+        }
       }
 
       // Hand preservation penalty if not forced special
       if (!player.isForcedSpecial && skill !== "NONE") {
-        score -= 30;
+        score -= 35;
       }
 
       // HARD: evaluate opponent mobility lookahead

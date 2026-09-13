@@ -5,6 +5,7 @@ import {
   playBombSound,
   playCounterSound,
   playFlipSound,
+  playPierceSound,
   playPlaceSound,
   playPurifySound,
   playGameOverSound,
@@ -32,6 +33,9 @@ describe("sound synthesizer", () => {
     }).not.toThrow();
     expect(() => {
       playFlipSound();
+    }).not.toThrow();
+    expect(() => {
+      playPierceSound();
     }).not.toThrow();
     expect(() => {
       playBlockSound();

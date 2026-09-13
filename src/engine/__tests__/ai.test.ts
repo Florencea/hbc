@@ -174,6 +174,36 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       expect(action).toBeDefined();
     });
 
+    it("ai_diversifies_skill_selection: does not spam BOMB and prioritizes WALL on high-value corners", () => {
+      const board = createEmptyBoard(16);
+      // Place pieces so Player 1 can capture into corner (0, 0)
+      board[0][2] = makePiece(1, 1, "NONE");
+      board[0][1] = makePiece(2, 2, "NONE");
+
+      const state = makeTestState(board, 1);
+      const player = state.players.find((p) => p.id === 1);
+      expect(player).toBeDefined();
+      if (!player) return;
+
+      // Full hand of specials
+      player.hand = {
+        NONE: Infinity,
+        WALL: 1,
+        PIERCE: 2,
+        BOMB: 2,
+        PURIFY: 1,
+        COUNTER: 1,
+      };
+
+      const action = selectBestMove(state, 1, "MEDIUM");
+      expect(action.type).toBe("PLACE_PIECE");
+      if (action.type === "PLACE_PIECE") {
+        expect(action.coord).toEqual({ x: 0, y: 0 });
+        // On a corner, WALL creates an impregnable corner wall and should beat BOMB
+        expect(action.skillType).toBe("WALL");
+      }
+    });
+
     it("ai_vs_ai_game_simulation: complete multi-turn match without any illegal move errors", () => {
       const presets: MapPreset[] = ["CROSSROADS", "ARCHIPELAGO", "TRENCHES"];
       for (const preset of presets) {
