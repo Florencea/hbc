@@ -2,6 +2,8 @@
 
 A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend for **HBC**: a Multi-Team Reversi / Othello variant featuring 5 unique skills, hidden traps, and recursive chain reactions.
 
+- **Live Demo**: [https://florencea.github.io/hbc/](https://florencea.github.io/hbc/)
+
 ## Core Architecture
 
 - **Headless Engine First**: Zero DOM, Canvas, React, or UI framework dependencies inside `src/engine/`. Pure TypeScript deterministic state transitions.
