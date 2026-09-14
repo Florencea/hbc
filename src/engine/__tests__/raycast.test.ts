@@ -1,22 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { traceRay, getLegalMoves, isValidCoord } from "../raycast.ts";
-import type { Board, Piece } from "../types.ts";
-import { makeTestState } from "./helpers.ts";
-
-function createEmptyBoard(size = 16): Board {
-  return Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null),
-  );
-}
-
-function makePiece(
-  teamId: number,
-  playerId: number,
-  skillType: Piece["skillType"] = "NONE",
-  isRevealed = false,
-): Piece {
-  return { teamId, playerId, skillType, isRevealed };
-}
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 describe("raycast", () => {
   it("validates coordinate boundaries correctly", () => {
@@ -29,9 +18,9 @@ describe("raycast", () => {
   it("finds captures in a standard line of opponent pieces", () => {
     const board = createEmptyBoard(16);
     // Attacker at (2, 2). Opponent pieces at (3, 2), (4, 2). Friendly piece at (5, 2).
-    board[2][3] = makePiece(2, 2);
-    board[2][4] = makePiece(2, 2);
-    board[2][5] = makePiece(1, 1);
+    setCell(board, 2, 3, makePiece(2, 2));
+    setCell(board, 2, 4, makePiece(2, 2));
+    setCell(board, 2, 5, makePiece(1, 1));
 
     const result = traceRay(
       board,
@@ -51,9 +40,9 @@ describe("raycast", () => {
 
   it("does not capture if ray hits an empty space before a friendly piece", () => {
     const board = createEmptyBoard(16);
-    board[2][3] = makePiece(2, 2);
+    setCell(board, 2, 3, makePiece(2, 2));
     // (4, 2) is empty, (5, 2) is friendly
-    board[2][5] = makePiece(1, 1);
+    setCell(board, 2, 5, makePiece(1, 1));
 
     const result = traceRay(
       board,
@@ -69,7 +58,7 @@ describe("raycast", () => {
 
   it("does not capture if adjacent piece is already friendly", () => {
     const board = createEmptyBoard(16);
-    board[2][3] = makePiece(1, 1);
+    setCell(board, 2, 3, makePiece(1, 1));
 
     const result = traceRay(
       board,
@@ -85,9 +74,9 @@ describe("raycast", () => {
 
   it("supports multi-team sandwiches (Team 1 sandwiching Team 2 and Team 3)", () => {
     const board = createEmptyBoard(16);
-    board[2][3] = makePiece(2, 2); // Team 2
-    board[2][4] = makePiece(3, 3); // Team 3
-    board[2][5] = makePiece(1, 4); // Team 1 ally
+    setCell(board, 2, 3, makePiece(2, 2)); // Team 2
+    setCell(board, 2, 4, makePiece(3, 3)); // Team 3
+    setCell(board, 2, 5, makePiece(1, 4)); // Team 1 ally
 
     const result = traceRay(
       board,
@@ -105,9 +94,9 @@ describe("raycast", () => {
 
   it("blocks non-PIERCE ray when encountering a WALL piece", () => {
     const board = createEmptyBoard(16);
-    board[2][3] = makePiece(2, 2);
-    board[2][4] = makePiece(2, 2, "WALL", false); // Unrevealed WALL
-    board[2][5] = makePiece(1, 1);
+    setCell(board, 2, 3, makePiece(2, 2));
+    setCell(board, 2, 4, makePiece(2, 2, "WALL", false)); // Unrevealed WALL
+    setCell(board, 2, 5, makePiece(1, 1));
 
     const result = traceRay(
       board,
@@ -125,9 +114,9 @@ describe("raycast", () => {
 
   it("penetrates a WALL piece when attacker uses PIERCE", () => {
     const board = createEmptyBoard(16);
-    board[2][3] = makePiece(2, 2);
-    board[2][4] = makePiece(2, 2, "WALL", false);
-    board[2][5] = makePiece(1, 1);
+    setCell(board, 2, 3, makePiece(2, 2));
+    setCell(board, 2, 4, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 5, makePiece(1, 1));
 
     const result = traceRay(
       board,
@@ -148,10 +137,10 @@ describe("raycast", () => {
   it("calculates all legal moves on a board", () => {
     const board = createEmptyBoard(16);
     // Standard 2x2 center at (7, 7), (7, 8), (8, 7), (8, 8)
-    board[7][7] = makePiece(1, 1);
-    board[7][8] = makePiece(2, 2);
-    board[8][7] = makePiece(2, 2);
-    board[8][8] = makePiece(1, 1);
+    setCell(board, 7, 7, makePiece(1, 1));
+    setCell(board, 7, 8, makePiece(2, 2));
+    setCell(board, 8, 7, makePiece(2, 2));
+    setCell(board, 8, 8, makePiece(1, 1));
 
     const state = makeTestState(board, 1);
 

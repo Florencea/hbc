@@ -7,7 +7,7 @@ import {
   type GameState,
   type Player,
 } from "../types.ts";
-import { createEmptyBoard, makePiece } from "./helpers.ts";
+import { createEmptyBoard, makePiece, setCell } from "./helpers.ts";
 
 function createEconomyPlayer(
   id: number,
@@ -64,8 +64,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
   it("cannot_play_skill_without_hand_stock: Throws error when playing a skill with count 0", () => {
     const board = createEmptyBoard(16);
     // Standard capture setup: (2, 2) [Team 1] captures (2, 3) [Team 2] against (2, 4) [Team 1]
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const players = [
       createEconomyPlayer(1, 1, "Player 1", {
@@ -96,8 +96,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
   it("playing_skill_decrements_hand_stock: Placing a skill reduces hand count by 1", () => {
     const board = createEmptyBoard(16);
     // (2, 2) [Team 1] captures (2, 3) [Team 2] against (2, 4) [Team 1]
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const players = [
       createEconomyPlayer(1, 1, "Player 1", {
@@ -132,8 +132,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
   it("cooldown_increments_and_grants_skill: Accumulating charges grants a skill and resets charge counter", () => {
     const board = createEmptyBoard(16);
     // (2, 2) [Team 1] captures (2, 3) [Team 2] against (2, 4) [Team 1]
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     // PIERCE has CD = 3, maxHand = 2
     // Set charge to 2 (cd - 1) so that after 1 move it reaches CD (3)
@@ -185,8 +185,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
 
   it("forced_discharge_triggers_on_cap_overflow: Reaching cap and completing CD enforces isForcedSpecial: true", () => {
     const board = createEmptyBoard(16);
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     // All skills at maxHand except BOMB which is at maxHand - 1 with charge at cd - 1
     const players = [
@@ -237,8 +237,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
   it("forced_discharge_rejects_none_placement: When isForcedSpecial: true, playing NONE throws an error", () => {
     const board = createEmptyBoard(16);
     // (2, 2) [Team 1] captures (2, 3) [Team 2] against (2, 4) [Team 1]
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const players = [
       createEconomyPlayer(1, 1, "Player 1", {
@@ -366,8 +366,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
 
   it("charge_freezes_when_hand_is_at_cap: A player holding max hand capacity for a skill does not accumulate charge points for that skill", () => {
     const board = createEmptyBoard(16);
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     // PIERCE is at maxHand (2), charge is 0. BOMB is at 0, charge is 0.
     const players = [
@@ -421,8 +421,8 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
 
   it("charge_resumes_after_skill_consumed: After placing a skill from max hand, the skill count decrements and charge resumes from 0 on the next turn", () => {
     const board = createEmptyBoard(16);
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     // Player 1 holds maxHand PIERCE (2) with charge frozen at 0
     const players = [

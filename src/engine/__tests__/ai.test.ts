@@ -3,7 +3,12 @@ import { getPositionalWeight, selectBestMove } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { MapPreset } from "../types.ts";
-import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
   describe("Positional Weight Matrix", () => {
@@ -30,7 +35,7 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       expect(getPositionalWeight({ x: 5, y: 5 }, board, size)).toBe(0);
 
       // When corner (0, 0) is occupied, adjacent edge square (1, 0) becomes a stable edge (+20)
-      board[0][0] = makePiece(1, 1, "NONE");
+      setCell(board, 0, 0, makePiece(1, 1, "NONE"));
       expect(getPositionalWeight({ x: 1, y: 0 }, board, size)).toBe(20);
     });
   });
@@ -60,7 +65,7 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       }
     });
 
-    it("ai_handles_forced_special_legally: when isForcedSpecial: true, AI chooses a valid special piece from hand and never outputs NONE", () => {
+    it("ai_handles_forced_special_status: when player has isForcedSpecial: true, AI selects a special piece from available hand", () => {
       const { state } = createInitialGame({
         mapPreset: "CROSSROADS",
         boardSize: 16,
@@ -71,6 +76,7 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       expect(activePlayer).toBeDefined();
       if (!activePlayer) return;
 
+      // Force special status
       activePlayer.isForcedSpecial = true;
       activePlayer.hand = {
         NONE: Infinity,
@@ -100,9 +106,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
     it("ai_selects_pioneer_bridge_when_no_captures_exist: in an isolated archipelago scenario, AI selects an empty tile within distance <= 2 that bridges toward target territory", () => {
       const board = createEmptyBoard(16);
       // Player 1 isolated at (4, 4)
-      board[4][4] = makePiece(1, 1, "NONE");
+      setCell(board, 4, 4, makePiece(1, 1, "NONE"));
       // Player 2 far away at (12, 12)
-      board[12][12] = makePiece(2, 2, "NONE");
+      setCell(board, 12, 12, makePiece(2, 2, "NONE"));
 
       const state = makeTestState(board, 1);
 
@@ -134,8 +140,8 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
     it("ai_passes_when_no_moves_possible: returns PASS_TURN when no standard or pioneer moves are available", () => {
       const board = createEmptyBoard(16);
       // Player 2 has pieces, but Player 1 has NO pieces anywhere
-      board[7][7] = makePiece(2, 2, "NONE");
-      board[8][8] = makePiece(2, 2, "NONE");
+      setCell(board, 7, 7, makePiece(2, 2, "NONE"));
+      setCell(board, 8, 8, makePiece(2, 2, "NONE"));
 
       const state = makeTestState(board, 1);
 
@@ -150,21 +156,21 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
     it("ai_operates_on_sanitized_state: verify AI evaluation does not throw when fed with sanitizeForViewer(state, botId)", () => {
       const board = createEmptyBoard(16);
       // Player 1 at (7, 5)
-      board[5][7] = makePiece(1, 1, "NONE");
+      setCell(board, 5, 7, makePiece(1, 1, "NONE"));
       // Player 2 has unrevealed hidden traps at (6, 7) and (7, 7)
-      board[7][6] = makePiece(2, 2, "BOMB", false);
-      board[7][7] = makePiece(2, 2, "COUNTER", false);
+      setCell(board, 7, 6, makePiece(2, 2, "BOMB", false));
+      setCell(board, 7, 7, makePiece(2, 2, "COUNTER", false));
 
       const state = makeTestState(board, 1);
 
       // Verify state before sanitize has secret traps
-      expect(state.board[7][6]?.skillType).toBe("BOMB");
-      expect(state.board[7][7]?.skillType).toBe("COUNTER");
+      expect(state.board[7]?.[6]?.skillType).toBe("BOMB");
+      expect(state.board[7]?.[7]?.skillType).toBe("COUNTER");
 
       // Sanitize for bot (Player 1)
       const sanitized = sanitizeForViewer(state, 1);
-      expect(sanitized.board[7][6]?.skillType).toBe("NONE");
-      expect(sanitized.board[7][7]?.skillType).toBe("NONE");
+      expect(sanitized.board[7]?.[6]?.skillType).toBe("NONE");
+      expect(sanitized.board[7]?.[7]?.skillType).toBe("NONE");
 
       // Bot evaluation on sanitized state must execute without errors
       expect(() => selectBestMove(sanitized, 1, "MEDIUM")).not.toThrow();
@@ -177,8 +183,8 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
     it("ai_diversifies_skill_selection: does not spam BOMB and prioritizes WALL on high-value corners", () => {
       const board = createEmptyBoard(16);
       // Place pieces so Player 1 can capture into corner (0, 0)
-      board[0][2] = makePiece(1, 1, "NONE");
-      board[0][1] = makePiece(2, 2, "NONE");
+      setCell(board, 0, 2, makePiece(1, 1, "NONE"));
+      setCell(board, 0, 1, makePiece(2, 2, "NONE"));
 
       const state = makeTestState(board, 1);
       const player = state.players.find((p) => p.id === 1);
@@ -208,8 +214,8 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const board = createEmptyBoard(16);
       // Attacker Team 1 at (2, 2)
       // (3, 2) is Team 2 WALL; (4, 2) is Team 1 NONE
-      board[2][3] = makePiece(2, 2, "WALL", true);
-      board[2][4] = makePiece(1, 1, "NONE");
+      setCell(board, 2, 3, makePiece(2, 2, "WALL", true));
+      setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
       const state = makeTestState(board, 1);
       const player = state.players.find((p) => p.id === 1);
@@ -237,13 +243,13 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const board = createEmptyBoard(16);
       // Placed piece at (5, 5) PURIFY (Team 1)
       // Flanks (5, 6) [Team 2] against (5, 7) [Team 1]
-      board[5][6] = makePiece(2, 2, "NONE");
-      board[5][7] = makePiece(1, 1, "NONE");
+      setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+      setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
       // Surrounding cluster in 3x3 of (5, 5):
-      board[4][4] = makePiece(2, 2, "NONE");
-      board[4][5] = makePiece(2, 2, "NONE");
-      board[5][4] = makePiece(2, 2, "NONE");
+      setCell(board, 4, 4, makePiece(2, 2, "NONE"));
+      setCell(board, 4, 5, makePiece(2, 2, "NONE"));
+      setCell(board, 5, 4, makePiece(2, 2, "NONE"));
 
       const state = makeTestState(board, 1);
       const player = state.players.find((p) => p.id === 1);
@@ -271,8 +277,8 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const board = createEmptyBoard(16);
       // Placed piece at (1, 0) [C-square next to empty corner (0, 0)]
       // Flanks (2, 0) [Team 2] against (3, 0) [Team 1]
-      board[0][2] = makePiece(2, 2, "NONE");
-      board[0][3] = makePiece(1, 1, "NONE");
+      setCell(board, 0, 2, makePiece(2, 2, "NONE"));
+      setCell(board, 0, 3, makePiece(1, 1, "NONE"));
 
       const state = makeTestState(board, 1);
       const player = state.players.find((p) => p.id === 1);

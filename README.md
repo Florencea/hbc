@@ -1,5 +1,7 @@
 # HBC - Multi-Team Reversi Game Engine
 
+[![CI](https://github.com/florencea/hbc/actions/workflows/ci.yml/badge.svg)](https://github.com/florencea/hbc/actions/workflows/ci.yml)
+
 A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend for **HBC**: a Multi-Team Reversi / Othello variant featuring 5 unique skills, hidden traps, and recursive chain reactions.
 
 - **Live Demo**: [https://florencea.github.io/hbc/](https://florencea.github.io/hbc/)
@@ -64,14 +66,26 @@ Executes:
 6. `test` (Vitest headless unit test suite)
 7. `build` (Vite production bundle verification)
 
+### Agent Verification Ladder (`agent:*`)
+
+For autonomous coding agents and automated CI environments, a specialized, zero-formatting, fail-fast ladder is provided to eliminate ANSI escape sequences, spinners, and interactive prompts:
+
+- `npm run agent:verify:inner`: Sub-second static checks (`agent:typecheck` + `agent:lint`).
+- `npm run agent:test:unit`: Vitest headless suite in TAP flat output format.
+- `npm run agent:test:e2e`: Playwright headless browser smoke tests (with auto-build preview server).
+- `npm run agent:verify:gate`: Full fail-fast verification ladder (`agent:verify:inner` -> `agent:test:unit` -> `agent:test:e2e`).
+
 ## Available Scripts
+
+### Human Ergonomics
 
 | Script                      | Description                                           |
 | :-------------------------- | :---------------------------------------------------- |
 | `npm run dev`               | Start local Vite development server                   |
 | `npm run check:fast`        | Fast inner-loop check (`typecheck` + `lint` + `test`) |
 | `npm run check`             | Run the full unified verification gate                |
-| `npm run test`              | Run Vitest unit tests                                 |
+| `npm run test`              | Run Vitest unit and integration tests                 |
+| `npm run test:e2e`          | Run Playwright E2E smoke tests                        |
 | `npm run lint`              | Run ESLint strict checks                              |
 | `npm run lint:tailwind`     | Check Tailwind classes for canonical formatting       |
 | `npm run lint:tailwind:fix` | Auto-fix Tailwind non-canonical classes               |
@@ -79,6 +93,17 @@ Executes:
 | `npm run format:check`      | Check file formatting with Prettier                   |
 | `npm run check:deadcode`    | Check for unused code and dependencies with Knip      |
 | `npm run build`             | Build production bundle                               |
+
+### Agent & CI Ergonomics
+
+| Script                       | Description                                                     |
+| :--------------------------- | :-------------------------------------------------------------- |
+| `npm run agent:typecheck`    | Strict TypeScript compiler check (`tsc -b --pretty false`)      |
+| `npm run agent:lint`         | Pure non-colored ESLint and Tailwind canonical checks           |
+| `npm run agent:test:unit`    | Flat TAP output Vitest execution without colors or spinners     |
+| `npm run agent:test:e2e`     | Headless Playwright tests in line-by-line reporter mode         |
+| `npm run agent:verify:inner` | Inner-loop fail-fast validation (`typecheck` + `lint`)          |
+| `npm run agent:verify:gate`  | Full automated gate (`verify:inner` + `test:unit` + `test:e2e`) |
 
 ## Guidelines
 

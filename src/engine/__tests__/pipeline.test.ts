@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 import { createInitialState, dispatch } from "../pipeline.ts";
 
 describe("pipeline", () => {
@@ -44,12 +49,12 @@ describe("pipeline", () => {
     // Attacker Team 1 at (2, 2)
     // Ray right: (3, 2) Team 2 NONE; (4, 2) Team 2 WALL (unrevealed); (5, 2) Team 1 NONE
     // Ray down: (2, 3) Team 2 NONE; (2, 4) Team 1 NONE (valid capture path)
-    board[2][3] = makePiece(2, 2, "NONE");
-    board[2][4] = makePiece(2, 2, "WALL", false);
-    board[2][5] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "NONE"));
+    setCell(board, 2, 4, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 5, makePiece(1, 1, "NONE"));
 
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -79,8 +84,8 @@ describe("pipeline", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2) using PIERCE
     // (3, 2) Team 2 WALL; (4, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "WALL", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -107,9 +112,9 @@ describe("pipeline", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2)
     // (3, 2) Team 2 NONE; (4, 2) Team 2 COUNTER (unrevealed); (5, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "NONE");
-    board[2][4] = makePiece(2, 2, "COUNTER", false);
-    board[2][5] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "NONE"));
+    setCell(board, 2, 4, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 5, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -140,13 +145,13 @@ describe("pipeline", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2)
     // (3, 2) Team 2 COUNTER; (4, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "COUNTER", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
     // Adjacent to the COUNTER at (3, 2), place an unexploded BOMB belonging to Team 1 at (3, 3)
-    board[3][3] = makePiece(1, 1, "BOMB", false);
+    setCell(board, 3, 3, makePiece(1, 1, "BOMB", false));
     // Surrounding cell at (3, 4) Team 1 NONE
-    board[4][3] = makePiece(1, 1, "NONE");
+    setCell(board, 4, 3, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -172,11 +177,11 @@ describe("pipeline", () => {
     const board = createEmptyBoard(16);
     // Placed piece at (5, 5) PURIFY (Team 1)
     // Flanks (5, 6) [Team 2] against (5, 7) [Team 1]
-    board[5][6] = makePiece(2, 2, "NONE");
-    board[5][7] = makePiece(1, 1, "NONE");
+    setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+    setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
     // Inside 3x3 of (5, 5), there is an enemy BOMB at (4, 4)
-    board[4][4] = makePiece(2, 2, "BOMB", false);
+    setCell(board, 4, 4, makePiece(2, 2, "BOMB", false));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {

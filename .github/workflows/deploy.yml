@@ -1,10 +1,17 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches:
       - main
+    types:
+      - completed
   workflow_dispatch:
+
+env:
+  CI: "true"
+  NO_COLOR: "1"
 
 permissions:
   contents: read
@@ -17,6 +24,8 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy to GitHub Pages
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -24,8 +33,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
-      - name: Setup Node.js
+      - name: Setup Node.js (Strict Engine)
         uses: actions/setup-node@v7
         with:
           node-version-file: package.json
@@ -35,8 +46,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run verification checks
-        run: npm run check
+      - name: Build production bundle
+        run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

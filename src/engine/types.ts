@@ -22,7 +22,7 @@ export interface Piece {
   playerId: number;
   skillType: SkillType;
   isRevealed: boolean;
-  duration?: number;
+  duration?: number | undefined;
 }
 
 export type Board = (Piece | null)[][];
@@ -41,7 +41,7 @@ export interface Player {
   hand: Record<SkillType, number>;
   charge: Record<SkillType, number>;
   isForcedSpecial: boolean;
-  dropZone?: DropZone;
+  dropZone?: DropZone | undefined;
 }
 
 export interface GameState {
@@ -55,7 +55,7 @@ export interface GameState {
   mapPreset: MapPreset;
   isDropPhase: boolean;
   dropTurnsRemaining: number;
-  consecutivePasses?: number;
+  consecutivePasses?: number | undefined;
 }
 
 export interface MaskedPiece {
@@ -63,7 +63,7 @@ export interface MaskedPiece {
   playerId: number;
   skillType: SkillType;
   isRevealed: boolean;
-  duration?: number;
+  duration?: number | undefined;
 }
 
 export interface MaskedGameState {
@@ -77,14 +77,14 @@ export interface MaskedGameState {
   mapPreset: MapPreset;
   isDropPhase: boolean;
   dropTurnsRemaining: number;
-  consecutivePasses?: number;
+  consecutivePasses?: number | undefined;
 }
 
 export type GameEvent =
   | {
       type: "PIECE_PLACED";
       coord: Coord;
-      pos?: Coord;
+      pos?: Coord | undefined;
       piece: Piece;
     }
   | {
@@ -96,15 +96,15 @@ export type GameEvent =
   | {
       type: "RAYCAST_BLOCKED";
       coord: Coord;
-      pos?: Coord;
-      wallPos?: Coord;
+      pos?: Coord | undefined;
+      wallPos?: Coord | undefined;
       blockerPiece: Piece;
       direction: Coord;
     }
   | {
       type: "PIECE_REVEALED";
       coord: Coord;
-      pos?: Coord;
+      pos?: Coord | undefined;
       skillType: SkillType;
       reason: "BLOCK" | "PENETRATE" | "AURA" | "TRIGGER";
     }
@@ -117,29 +117,29 @@ export type GameEvent =
   | {
       type: "COUNTER_TRIGGERED";
       coord: Coord;
-      source?: Coord;
+      source?: Coord | undefined;
       defenderTeamId: number;
-      factionId?: number;
+      factionId?: number | undefined;
       reversedCoords: Coord[];
-      hijackedBatch?: Coord[];
+      hijackedBatch?: Coord[] | undefined;
     }
   | {
       type: "BOMB_TRIGGERED";
       coord: Coord;
-      center?: Coord;
+      center?: Coord | undefined;
       teamId: number;
-      factionId?: number;
+      factionId?: number | undefined;
       blastCoords: Coord[];
-      affected?: Coord[];
+      affected?: Coord[] | undefined;
     }
   | {
       type: "PURIFY_PULSE";
       coord: Coord;
-      center?: Coord;
+      center?: Coord | undefined;
       teamId: number;
-      factionId?: number;
+      factionId?: number | undefined;
       affectedCoords: Coord[];
-      affected?: Coord[];
+      affected?: Coord[] | undefined;
       remainingDuration: number;
     }
   | {
@@ -181,7 +181,7 @@ export type Action =
       type: "PLACE_PIECE";
       playerId: number;
       coord: Coord;
-      skillType?: SkillType;
+      skillType?: SkillType | undefined;
     }
   | {
       type: "PASS_TURN";
@@ -192,7 +192,7 @@ export interface RaycastResult {
   direction: Coord;
   capturedCoords: Coord[];
   isBlockedByWall: boolean;
-  blockedCoord?: Coord;
+  blockedCoord?: Coord | undefined;
   penetratedWallCoords: Coord[];
 }
 

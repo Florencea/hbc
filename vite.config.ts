@@ -16,5 +16,11 @@ export default defineConfig({
   ],
   test: {
     environment: "node",
+    silent: "passed-only",
+    allowOnly: !process.env.CI,
+    browser: {
+      headless: true,
+    },
+    include: ["src/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
   },
 });

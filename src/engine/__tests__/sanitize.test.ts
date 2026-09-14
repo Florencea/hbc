@@ -1,30 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeForViewer } from "../sanitize.ts";
-import type { Board, GameState, Piece } from "../types.ts";
-
-function createEmptyBoard(size = 16): Board {
-  return Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null),
-  );
-}
-
-function makePiece(
-  teamId: number,
-  playerId: number,
-  skillType: Piece["skillType"] = "NONE",
-  isRevealed = false,
-): Piece {
-  return { teamId, playerId, skillType, isRevealed };
-}
+import type { GameState } from "../types.ts";
+import { createEmptyBoard, makePiece, setCell } from "./helpers.ts";
 
 describe("sanitizeForViewer (Fog of War)", () => {
   const board = createEmptyBoard(16);
   // (2, 2) is Team 1 BOMB (unrevealed)
-  board[2][2] = makePiece(1, 1, "BOMB", false);
+  setCell(board, 2, 2, makePiece(1, 1, "BOMB", false));
   // (3, 3) is Team 2 COUNTER (unrevealed)
-  board[3][3] = makePiece(2, 2, "COUNTER", false);
+  setCell(board, 3, 3, makePiece(2, 2, "COUNTER", false));
   // (4, 4) is Team 2 WALL (revealed)
-  board[4][4] = makePiece(2, 2, "WALL", true);
+  setCell(board, 4, 4, makePiece(2, 2, "WALL", true));
 
   const state: GameState = {
     board,

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 import {
   createInitialGame,
   createInitialState,
@@ -7,6 +12,7 @@ import {
   dispatch,
   getDistance,
   getLegalMoves,
+  getPiece,
   IllegalMoveError,
   isWithinDropZone,
 } from "../index.ts";
@@ -15,13 +21,13 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
   it("neutral_pieces_captured_by_any_team: Team 1 and Team 2 can sandwich neutral pieces and convert them", () => {
     const board = createEmptyBoard(16);
     // Team 1 test: Friendly at (2, 2), Neutral at (3, 2) & (4, 2)
-    board[2][2] = makePiece(1, 1, "NONE");
-    board[2][3] = createNeutralPiece();
-    board[2][4] = createNeutralPiece();
+    setCell(board, 2, 2, makePiece(1, 1, "NONE"));
+    setCell(board, 2, 3, createNeutralPiece());
+    setCell(board, 2, 4, createNeutralPiece());
 
     // Team 2 test: Friendly at (8, 8), Neutral at (8, 9)
-    board[8][8] = makePiece(2, 2, "NONE");
-    board[9][8] = createNeutralPiece();
+    setCell(board, 8, 8, makePiece(2, 2, "NONE"));
+    setCell(board, 9, 8, createNeutralPiece());
 
     const state = makeTestState(board, 1);
 
@@ -66,27 +72,32 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
   it("drop_phase_restricts_out_of_bound_moves: Placing outside assigned drop zone throws IllegalMoveError", () => {
     const board = createEmptyBoard(16);
     // Player 1 anchor at (7, 7)
-    board[7][7] = makePiece(1, 1, "NONE");
-    board[7][6] = createNeutralPiece();
+    setCell(board, 7, 7, makePiece(1, 1, "NONE"));
+    setCell(board, 7, 6, createNeutralPiece());
 
     // Far away pieces that would constitute a legal reversi capture if not in drop phase
-    board[1][1] = makePiece(1, 1, "NONE");
-    board[1][2] = makePiece(2, 2, "NONE");
+    setCell(board, 1, 1, makePiece(1, 1, "NONE"));
+    setCell(board, 1, 2, makePiece(2, 2, "NONE"));
 
     const state = makeTestState(board, 1);
     state.isDropPhase = true;
     state.dropTurnsRemaining = 4;
-    state.players[0].dropZone = {
-      center: { x: 7, y: 7 },
-      radius: 2,
-    };
+    const player1 = state.players[0];
+    if (player1) {
+      player1.dropZone = {
+        center: { x: 7, y: 7 },
+        radius: 2,
+      };
+    }
 
     // (1, 3) would capture (1, 2) against (1, 1), but is far outside dropZone (center 7, 7 radius 2)
-    const p1DropZone = state.players[0].dropZone;
+    const p1DropZone = player1?.dropZone;
     expect(p1DropZone).toBeDefined();
-    expect(getDistance({ x: 3, y: 1 }, p1DropZone.center)).toBeGreaterThan(
-      p1DropZone.radius,
-    );
+    if (p1DropZone) {
+      expect(getDistance({ x: 3, y: 1 }, p1DropZone.center)).toBeGreaterThan(
+        p1DropZone.radius,
+      );
+    }
 
     expect(() =>
       dispatch(state, {
@@ -118,8 +129,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(state.dropTurnsRemaining).toBe(4);
 
     const p1 = state.players[0];
-    expect(p1.dropZone).toBeDefined();
-    if (!p1.dropZone) {
+    expect(p1).toBeDefined();
+    if (!p1?.dropZone) {
       throw new Error("Drop zone not defined");
     }
 
@@ -190,8 +201,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
 
     // Turn 5: Set up a board opportunity outside initial drop zone
     // Player 1 can now legally place outside their initial drop zone
-    turn4.nextState.board[1][1] = makePiece(1, 1, "NONE");
-    turn4.nextState.board[1][2] = makePiece(2, 2, "NONE");
+    setCell(turn4.nextState.board, 1, 1, makePiece(1, 1, "NONE"));
+    setCell(turn4.nextState.board, 1, 2, makePiece(2, 2, "NONE"));
 
     const turn5 = dispatch(turn4.nextState, {
       type: "PLACE_PIECE",
@@ -245,6 +256,9 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     const archLegalMoves = getLegalMoves(archState, archState.activePlayerId);
     expect(archLegalMoves.length).toBeGreaterThan(0);
     const archMove = archLegalMoves[0];
+    if (!archMove) {
+      throw new Error("No archipelago legal moves found");
+    }
 
     const archRes = dispatch(archState, {
       type: "PLACE_PIECE",
@@ -267,8 +281,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
 
     // Neutral pieces form intersecting paths along row 8 and col 8
     const mid = 8;
-    expect(trenchState.board[mid]?.[4]?.teamId).toBe(0);
-    expect(trenchState.board[4]?.[mid]?.teamId).toBe(0);
+    expect(getPiece(trenchState.board, 4, mid)?.teamId).toBe(0);
+    expect(getPiece(trenchState.board, mid, 4)?.teamId).toBe(0);
 
     // Every player has a dropZone containing neutral pieces
     for (const player of trenchState.players) {
@@ -295,6 +309,9 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     );
     expect(trenchLegalMoves.length).toBeGreaterThan(0);
     const trenchMove = trenchLegalMoves[0];
+    if (!trenchMove) {
+      throw new Error("No trenches legal moves found");
+    }
 
     const trenchRes = dispatch(trenchState, {
       type: "PLACE_PIECE",
@@ -322,7 +339,7 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     if (startEvent?.type === "DROP_PHASE_STARTED") {
       expect(startEvent.mapPreset).toBe("CROSSROADS");
       expect(startEvent.players).toHaveLength(2);
-      expect(startEvent.players[0].dropZone.radius).toBe(3);
+      expect(startEvent.players[0]?.dropZone.radius).toBe(3);
     }
   });
 });

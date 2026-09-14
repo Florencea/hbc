@@ -674,7 +674,7 @@ export default function App() {
             for (let y = 0; y < gameState.size; y++) {
               for (let x = 0; x < gameState.size; x++) {
                 if (x === pos.x && y === pos.y) continue;
-                const p = currentIntermediateBoard[y][x];
+                const p = currentIntermediateBoard[y]?.[x];
                 if (p?.teamId === piece.teamId) {
                   const d = Math.max(Math.abs(x - pos.x), Math.abs(y - pos.y));
                   if (d < minDistance) {
@@ -866,7 +866,7 @@ export default function App() {
               setIsScreenShaking(false);
             }, durationMs);
           },
-          onTriggerScreenFlash: (color = "purple", durationMs = 350) => {
+          onTriggerScreenFlash: (color, durationMs = 350) => {
             setScreenFlash(color);
             setTimeout(() => {
               setScreenFlash(null);
@@ -1985,7 +1985,7 @@ export default function App() {
                         </div>
                         <span className="text-[11px] text-amber-200/80">
                           {isPlayer1Ai
-                            ? `AI 已選【${SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}】`
+                            ? `AI 已選【${SKILL_CONFIG[effectiveSkill].label.split(" ")[0] ?? ""}】`
                             : "庫存已滿・限落特殊棋"}
                         </span>
                       </div>
@@ -2238,7 +2238,7 @@ export default function App() {
                         </div>
                         <span className="text-[11px] text-amber-200/80">
                           {isPlayer2Ai
-                            ? `AI 已選【${SKILL_CONFIG[effectiveSkill].label.split(" ")[0]}】`
+                            ? `AI 已選【${SKILL_CONFIG[effectiveSkill].label.split(" ")[0] ?? ""}】`
                             : "庫存已滿・限落特殊棋"}
                         </span>
                       </div>

@@ -6,7 +6,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["dist", ".vitest"]),
+  globalIgnores(["dist", ".vitest", "test-results", "playwright-report"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
@@ -21,6 +21,7 @@ export default defineConfig([
       },
     },
     rules: {
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-definitions": "off",
       "@typescript-eslint/ban-ts-comment": [
         "error",
@@ -43,6 +44,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      "react-hooks/exhaustive-deps": "error",
+    },
   },
   {
     files: ["src/engine/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
@@ -54,7 +58,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["scripts/**/*.{ts,tsx}", "*.config.ts"],
+    files: ["scripts/**/*.{ts,tsx}", "*.config.ts", "e2e/**/*.{ts,tsx}"],
     languageOptions: {
       globals: globals.node,
     },

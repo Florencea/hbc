@@ -1,4 +1,9 @@
-import { generateMap, IllegalMoveError, isWithinDropZone } from "./map.ts";
+import {
+  generateMap,
+  IllegalMoveError,
+  isWithinDropZone,
+  setPiece,
+} from "./map.ts";
 import {
   collectAllRaycasts,
   DIRECTIONS,
@@ -236,7 +241,8 @@ export function dispatch(
 
     // Advance turn
     const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
-    const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
+    const nextPlayer =
+      newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
 
     // Advance drop phase if active
     let isDropPhase = state.isDropPhase;
@@ -384,7 +390,7 @@ export function dispatch(
       isRevealed: isPurify || attackerSkill === "NONE",
       duration: isPurify ? 3 : undefined,
     };
-    newBoard[action.coord.y][action.coord.x] = newPiece;
+    setPiece(newBoard, action.coord.x, action.coord.y, newPiece);
 
     events.push({
       type: "PIECE_PLACED",
@@ -432,7 +438,7 @@ export function dispatch(
     isRevealed: isPurify || attackerSkill === "NONE",
     duration: isPurify ? 3 : undefined,
   };
-  newBoard[action.coord.y][action.coord.x] = newPiece;
+  setPiece(newBoard, action.coord.x, action.coord.y, newPiece);
 
   events.push({
     type: "PIECE_PLACED",
@@ -794,7 +800,8 @@ function finalizePlacementTurn(
 
   // Advance turn and check game over
   const activeIdx = newPlayers.findIndex((p) => p.id === actionPlayerId);
-  const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length];
+  const nextPlayer =
+    newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
 
   events.push({
     type: "TURN_CHANGED",

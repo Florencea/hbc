@@ -85,6 +85,30 @@ Runs:
 2. `lint` (ESLint strict + stylistic type checks)
 3. `test` (Vitest unit and integration test suite)
 
+### Agent Verification Ladder (`agent:*`)
+
+When working as an automated coding agent or within CI runners, strictly prefer the `agent:*` scripts. These scripts output zero ANSI escape codes, disable interactive terminals/spinners, enforce strict fail-fast ordering, and format test results cleanly:
+
+```bash
+# 1. Inner loop static checks (TypeScript strict + ESLint + Tailwind canonical)
+npm run agent:verify:inner
+
+# 2. Unit and integration tests (Vitest flat TAP reporter, zero color)
+npm run agent:test:unit
+
+# 3. Playwright browser smoke tests (auto-builds Vite preview server, headless Chromium)
+npm run agent:test:e2e
+
+# 4. Full Agent Verification Gate (Fail-fast: Inner -> Unit -> E2E)
+npm run agent:verify:gate
+```
+
+Key rules:
+
+- **No `.only`**: Vitest and Playwright disallow `.only` in CI (`allowOnly: !process.env.CI`, `forbidOnly: !!process.env.CI`).
+- **No loose indexing**: `noUncheckedIndexedAccess: true` and `exactOptionalPropertyTypes: true` are enforced codebase-wide.
+- **Headless execution**: All test runners operate headlessly without spawning external browser windows or blocking stdin.
+
 ### Outer Loop: Unified Verification Gate (`check`)
 
 Before completing any task, PR, or commit, execute the full Definition of Done:

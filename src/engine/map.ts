@@ -31,6 +31,22 @@ export function createNeutralPiece(): Piece {
   };
 }
 
+export function setPiece(
+  board: Board,
+  x: number,
+  y: number,
+  piece: Piece | null,
+): void {
+  const row = board[y];
+  if (row) {
+    row[x] = piece;
+  }
+}
+
+export function getPiece(board: Board, x: number, y: number): Piece | null {
+  return board[y]?.[x] ?? null;
+}
+
 export interface GeneratedMap {
   board: Board;
   dropZones: Map<number, DropZone>;
@@ -49,30 +65,30 @@ function generateCrossroadsMap(size: number, players: Player[]): GeneratedMap {
   const p4 = players.length > 3 ? players[3] : undefined;
 
   // Standard center formation
-  board[mid - 1][mid - 1] = {
+  setPiece(board, mid - 1, mid - 1, {
     teamId: p1 ? p1.teamId : 1,
     playerId: p1 ? p1.id : 1,
     skillType: "NONE",
     isRevealed: true,
-  };
-  board[mid - 1][mid] = {
+  });
+  setPiece(board, mid, mid - 1, {
     teamId: p2 ? p2.teamId : 2,
     playerId: p2 ? p2.id : 2,
     skillType: "NONE",
     isRevealed: true,
-  };
-  board[mid][mid - 1] = {
+  });
+  setPiece(board, mid - 1, mid, {
     teamId: p2 ? p2.teamId : 2,
     playerId: p2 ? p2.id : 2,
     skillType: "NONE",
     isRevealed: true,
-  };
-  board[mid][mid] = {
+  });
+  setPiece(board, mid, mid, {
     teamId: p1 ? p1.teamId : 1,
     playerId: p1 ? p1.id : 1,
     skillType: "NONE",
     isRevealed: true,
-  };
+  });
 
   // Clustered center neutral anchors (4x4 cross pattern around center)
   const neutralCoords: Coord[] = [
@@ -96,9 +112,9 @@ function generateCrossroadsMap(size: number, players: Player[]): GeneratedMap {
       coord.x < size &&
       coord.y >= 0 &&
       coord.y < size &&
-      board[coord.y][coord.x] === null
+      getPiece(board, coord.x, coord.y) === null
     ) {
-      board[coord.y][coord.x] = createNeutralPiece();
+      setPiece(board, coord.x, coord.y, createNeutralPiece());
     }
   }
 
@@ -173,7 +189,7 @@ function generateArchipelagoMap(size: number, players: Player[]): GeneratedMap {
   for (const island of islands) {
     for (const coord of island) {
       if (coord.x >= 0 && coord.x < size && coord.y >= 0 && coord.y < size) {
-        board[coord.y][coord.x] = createNeutralPiece();
+        setPiece(board, coord.x, coord.y, createNeutralPiece());
       }
     }
   }
@@ -188,15 +204,21 @@ function generateArchipelagoMap(size: number, players: Player[]): GeneratedMap {
 
   players.forEach((player, idx) => {
     const anchor = playerAnchorPositions[idx % playerAnchorPositions.length];
-    if (anchor.x >= 0 && anchor.x < size && anchor.y >= 0 && anchor.y < size) {
-      board[anchor.y][anchor.x] = {
+    if (
+      anchor &&
+      anchor.x >= 0 &&
+      anchor.x < size &&
+      anchor.y >= 0 &&
+      anchor.y < size
+    ) {
+      setPiece(board, anchor.x, anchor.y, {
         teamId: player.teamId,
         playerId: player.id,
         skillType: "NONE",
         isRevealed: true,
-      };
+      });
       dropZones.set(player.id, {
-        center: { ...anchor },
+        center: { x: anchor.x, y: anchor.y },
         radius: 3,
       });
     }
@@ -215,22 +237,22 @@ function generateTrenchesMap(size: number, players: Player[]): GeneratedMap {
   // Linear neutral paths intersecting across the board with placement gaps
   // Center intersection segment:
   for (let x = mid - 2; x <= mid + 1; x++) {
-    board[mid][x] = createNeutralPiece();
+    setPiece(board, x, mid, createNeutralPiece());
   }
   for (let y = mid - 2; y <= mid + 1; y++) {
-    board[y][mid] = createNeutralPiece();
+    setPiece(board, mid, y, createNeutralPiece());
   }
 
   // Outer trench segments
-  board[mid][3] = createNeutralPiece();
-  board[mid][4] = createNeutralPiece();
-  board[mid][size - 5] = createNeutralPiece();
-  board[mid][size - 4] = createNeutralPiece();
+  setPiece(board, 3, mid, createNeutralPiece());
+  setPiece(board, 4, mid, createNeutralPiece());
+  setPiece(board, size - 5, mid, createNeutralPiece());
+  setPiece(board, size - 4, mid, createNeutralPiece());
 
-  board[3][mid] = createNeutralPiece();
-  board[4][mid] = createNeutralPiece();
-  board[size - 5][mid] = createNeutralPiece();
-  board[size - 4][mid] = createNeutralPiece();
+  setPiece(board, mid, 3, createNeutralPiece());
+  setPiece(board, mid, 4, createNeutralPiece());
+  setPiece(board, mid, size - 5, createNeutralPiece());
+  setPiece(board, mid, size - 4, createNeutralPiece());
 
   // Player anchors at the extremities of the intersecting trenches
   const anchorPositions: Coord[] = [
@@ -242,15 +264,21 @@ function generateTrenchesMap(size: number, players: Player[]): GeneratedMap {
 
   players.forEach((player, idx) => {
     const anchor = anchorPositions[idx % anchorPositions.length];
-    if (anchor.x >= 0 && anchor.x < size && anchor.y >= 0 && anchor.y < size) {
-      board[anchor.y][anchor.x] = {
+    if (
+      anchor &&
+      anchor.x >= 0 &&
+      anchor.x < size &&
+      anchor.y >= 0 &&
+      anchor.y < size
+    ) {
+      setPiece(board, anchor.x, anchor.y, {
         teamId: player.teamId,
         playerId: player.id,
         skillType: "NONE",
         isRevealed: true,
-      };
+      });
       dropZones.set(player.id, {
-        center: { ...anchor },
+        center: { x: anchor.x, y: anchor.y },
         radius: 3,
       });
     }

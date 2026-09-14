@@ -6,6 +6,18 @@ export function createEmptyBoard(size = 16): Board {
   );
 }
 
+export function setCell(
+  board: Board,
+  y: number,
+  x: number,
+  piece: Piece | null,
+): void {
+  const row = board[y];
+  if (row) {
+    row[x] = piece;
+  }
+}
+
 export function makePiece(
   teamId: number,
   playerId: number,

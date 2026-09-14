@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  CI: "true"
+  NO_COLOR: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck (Fail-Fast)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js (Strict Engine)
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run inner loop verification (TypeScript & ESLint & Tailwind)
+        run: npm run agent:verify:inner
+
+      - name: Run code formatting check
+        run: npm run format:check
+
+      - name: Run dead code and unused export check (Knip)
+        run: npm run check:deadcode
+
+  unit-test:
+    name: Unit Tests (${{ matrix.os }} / Node ${{ matrix.node-version }})
+    needs: [lint-and-typecheck]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [22, 24]
+    env:
+      NPM_CONFIG_ENGINE_STRICT: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit test suite
+        run: npm run agent:test:unit
+
+  e2e-and-build:
+    name: E2E & Build (${{ matrix.os }} / Node ${{ matrix.node-version }})
+    needs: [lint-and-typecheck]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [24]
+    env:
+      NPM_CONFIG_ENGINE_STRICT: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium with dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Run Playwright E2E smoke tests
+        run: npm run agent:test:e2e
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

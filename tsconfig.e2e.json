@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
     "target": "es2023",
     "lib": ["ES2023"],
     "types": ["node"],
@@ -22,10 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "vite.config.ts",
-    "eslint.config.ts",
-    "prettier.config.ts",
-    "scripts/**/*.ts"
-  ]
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
 }

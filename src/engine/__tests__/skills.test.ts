@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyBoard, makePiece, makeTestState } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 import { dispatch, resolveAction } from "../pipeline.ts";
 
 describe("Skill Engine Specification Suite (skills.test.ts)", () => {
@@ -7,12 +12,12 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2)
     // Downward ray: valid capture (2, 3) [Team 2] against (2, 4) [Team 1]
-    board[3][2] = makePiece(2, 2, "NONE");
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "NONE"));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     // Rightward ray: hidden enemy WALL at (4, 2), Team 2 piece at (3, 2)
-    board[2][4] = makePiece(2, 2, "WALL", false);
-    board[2][3] = makePiece(2, 2, "NONE");
+    setCell(board, 2, 4, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 3, makePiece(2, 2, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -47,8 +52,8 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2) plays PIERCE
     // (3, 2) is Team 2 WALL (hidden); (4, 2) is Team 1 NONE
-    board[2][3] = makePiece(2, 2, "WALL", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -76,8 +81,8 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2) plays PIERCE
     // (3, 2) is Team 2 COUNTER (hidden); (4, 2) is Team 1 NONE
-    board[2][3] = makePiece(2, 2, "COUNTER", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -105,9 +110,9 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2) plays NONE
     // (3, 2) Team 2 NONE; (4, 2) Team 2 COUNTER (hidden); (5, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "NONE");
-    board[2][4] = makePiece(2, 2, "COUNTER", false);
-    board[2][5] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "NONE"));
+    setCell(board, 2, 4, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 5, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -137,13 +142,13 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2)
     // (3, 2) Team 2 COUNTER (hidden); (4, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "COUNTER", false);
-    board[2][4] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
 
     // Adjacent to the COUNTER at (3, 2), place an unexploded BOMB belonging to Team 1 at (3, 3)
-    board[3][3] = makePiece(1, 1, "BOMB", false);
+    setCell(board, 3, 3, makePiece(1, 1, "BOMB", false));
     // Surrounding cell at (3, 4) Team 1 NONE
-    board[4][3] = makePiece(1, 1, "NONE");
+    setCell(board, 4, 3, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -172,13 +177,13 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 2 at (2, 2)
     // (3, 2) is Team 1 BOMB (hidden); (4, 2) is Team 2 NONE
-    board[2][3] = makePiece(1, 1, "BOMB", false);
-    board[2][4] = makePiece(2, 2, "NONE");
+    setCell(board, 2, 3, makePiece(1, 1, "BOMB", false));
+    setCell(board, 2, 4, makePiece(2, 2, "NONE"));
 
     // Inside 3x3 blast of BOMB 1, place BOMB 2 at (4, 3) [Team 1 BOMB]
-    board[3][4] = makePiece(1, 1, "BOMB", false);
+    setCell(board, 3, 4, makePiece(1, 1, "BOMB", false));
     // Inside 3x3 blast of BOMB 2, place another piece at (5, 4) [Team 2 NONE]
-    board[4][5] = makePiece(2, 2, "NONE");
+    setCell(board, 4, 5, makePiece(2, 2, "NONE"));
 
     const state = makeTestState(board, 2);
     const { nextState, events } = resolveAction(state, {
@@ -218,14 +223,14 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Placed piece at (5, 5) PURIFY (Team 1)
     // Flanks (5, 6) [Team 2] against (5, 7) [Team 1]
-    board[5][6] = makePiece(2, 2, "NONE");
-    board[5][7] = makePiece(1, 1, "NONE");
+    setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+    setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
     // Inside 3x3 of (5, 5):
     // Enemy BOMB at (4, 4)
-    board[4][4] = makePiece(2, 2, "BOMB", false);
+    setCell(board, 4, 4, makePiece(2, 2, "BOMB", false));
     // Enemy COUNTER at (4, 5)
-    board[5][4] = makePiece(2, 2, "COUNTER", false);
+    setCell(board, 5, 4, makePiece(2, 2, "COUNTER", false));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = resolveAction(state, {
@@ -257,8 +262,8 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Placed piece at (5, 5) PURIFY (Team 1)
     // Flanks (5, 6) [Team 2] against (5, 7) [Team 1]
-    board[5][6] = makePiece(2, 2, "NONE");
-    board[5][7] = makePiece(1, 1, "NONE");
+    setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+    setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
 
@@ -295,13 +300,13 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Setup exact board state from user's event log:
     // (8, 7) Team 1 NONE
-    board[7][8] = makePiece(1, 1, "NONE");
+    setCell(board, 7, 8, makePiece(1, 1, "NONE"));
     // (9, 7) Team 1 BOMB (unrevealed)
-    board[7][9] = makePiece(1, 1, "BOMB", false);
+    setCell(board, 7, 9, makePiece(1, 1, "BOMB", false));
     // (9, 8) Team 2 NONE
-    board[8][9] = makePiece(2, 2, "NONE");
+    setCell(board, 8, 9, makePiece(2, 2, "NONE"));
     // (8, 8) Team 2 NONE
-    board[8][8] = makePiece(2, 2, "NONE");
+    setCell(board, 8, 8, makePiece(2, 2, "NONE"));
 
     // Player 2 plays at (9, 6), which flanks (9, 7) [Team 1 BOMB] against (9, 8) [Team 2]
     const state = makeTestState(board, 2);
@@ -339,10 +344,10 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("wall_penetrated_by_pierce_reverts_to_none_and_does_not_block_later: WALL penetrated by PIERCE becomes NONE and no longer blocks raycasts", () => {
     const board = createEmptyBoard(16);
     // (2, 1) Team 2 NONE anchor
-    board[1][2] = makePiece(2, 2, "NONE");
+    setCell(board, 1, 2, makePiece(2, 2, "NONE"));
     // (2, 3) Team 2 WALL, (2, 4) Team 1 NONE
-    board[3][2] = makePiece(2, 2, "WALL", false);
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "WALL", false));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     // Turn 1: Player 1 plays PIERCE at (2, 2)
@@ -378,10 +383,10 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("counter_bypassed_by_pierce_reverts_to_none_and_does_not_counter_later: COUNTER bypassed by PIERCE becomes NONE and does not trigger on next flip", () => {
     const board = createEmptyBoard(16);
     // (2, 1) Team 2 NONE anchor
-    board[1][2] = makePiece(2, 2, "NONE");
+    setCell(board, 1, 2, makePiece(2, 2, "NONE"));
     // (2, 3) Team 2 COUNTER, (2, 4) Team 1 NONE
-    board[3][2] = makePiece(2, 2, "COUNTER", false);
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     // Turn 1: Player 1 plays PIERCE at (2, 2)
@@ -414,8 +419,8 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("purify_clears_duration_and_reverts_to_none_when_flipped: PURIFY flipped by sandwiching clears duration and stops pulsing", () => {
     const board = createEmptyBoard(16);
     // (2, 3) Team 2 PURIFY (duration = 3), (2, 4) Team 1 NONE
-    board[3][2] = { ...makePiece(2, 2, "PURIFY", true), duration: 3 };
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, { ...makePiece(2, 2, "PURIFY", true), duration: 3 });
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -440,8 +445,8 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("pierce_reverts_to_none_when_flipped_by_normal_piece: PIERCE flipped by raycast reverts to standard piece", () => {
     const board = createEmptyBoard(16);
     // (2, 3) Team 2 PIERCE, (2, 4) Team 1 NONE
-    board[3][2] = makePiece(2, 2, "PIERCE", true);
-    board[4][2] = makePiece(1, 1, "NONE");
+    setCell(board, 3, 2, makePiece(2, 2, "PIERCE", true));
+    setCell(board, 4, 2, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState } = dispatch(state, {
@@ -460,9 +465,9 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const board = createEmptyBoard(16);
     // Attacker Team 1 at (2, 2) plays NONE
     // Line: (3, 2) Team 2 PIERCE; (4, 2) Team 2 COUNTER; (5, 2) Team 1 NONE
-    board[2][3] = makePiece(2, 2, "PIERCE", false);
-    board[2][4] = makePiece(2, 2, "COUNTER", false);
-    board[2][5] = makePiece(1, 1, "NONE");
+    setCell(board, 2, 3, makePiece(2, 2, "PIERCE", false));
+    setCell(board, 2, 4, makePiece(2, 2, "COUNTER", false));
+    setCell(board, 2, 5, makePiece(1, 1, "NONE"));
 
     const state = makeTestState(board, 1);
     const { nextState, events } = dispatch(state, {
@@ -490,11 +495,11 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("purify_pulse_retains_wall_skill_on_conversion: PURIFY converts enemy WALL faction without clearing WALL skill", () => {
     const board = createEmptyBoard(16);
     // Flanking line for Player 1 PURIFY at (5, 5): (5, 6) Team 2 NONE, (5, 7) Team 1 NONE
-    board[5][6] = makePiece(2, 2, "NONE");
-    board[5][7] = makePiece(1, 1, "NONE");
+    setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+    setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
     // Adjacent at (4, 5): Team 2 WALL
-    board[5][4] = makePiece(2, 2, "WALL", false);
+    setCell(board, 5, 4, makePiece(2, 2, "WALL", false));
 
     const state = makeTestState(board, 1);
     const turn1 = dispatch(state, {
@@ -511,11 +516,11 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
 
     // Turn 2: Player 2 plays at (3, 5).
     // Setup rightward ray obstacle: (4, 5) is Team 1 WALL, (5, 5) is Team 1, (6, 5) is Team 2 NONE.
-    turn1.nextState.board[5][6] = makePiece(2, 2, "NONE");
+    setCell(turn1.nextState.board, 5, 6, makePiece(2, 2, "NONE"));
     // Setup downward legal capture for Player 2 at (3, 5):
     // (3, 6) Team 1 NONE, (3, 7) Team 2 NONE
-    turn1.nextState.board[6][3] = makePiece(1, 1, "NONE");
-    turn1.nextState.board[7][3] = makePiece(2, 2, "NONE");
+    setCell(turn1.nextState.board, 6, 3, makePiece(1, 1, "NONE"));
+    setCell(turn1.nextState.board, 7, 3, makePiece(2, 2, "NONE"));
 
     // Player 2 plays at (3, 5). Downward ray captures (3, 6). Rightward ray is BLOCKED by (4, 5) WALL!
     const turn2 = dispatch(turn1.nextState, {
@@ -541,11 +546,11 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("purify_pulse_retains_purify_skill_on_conversion: PURIFY assimilates enemy PURIFY without clearing PURIFY skill", () => {
     const board = createEmptyBoard(16);
     // Flanking line for Player 1 PURIFY at (5, 5): (5, 6) Team 2 NONE, (5, 7) Team 1 NONE
-    board[5][6] = makePiece(2, 2, "NONE");
-    board[5][7] = makePiece(1, 1, "NONE");
+    setCell(board, 5, 6, makePiece(2, 2, "NONE"));
+    setCell(board, 5, 7, makePiece(1, 1, "NONE"));
 
     // Adjacent at (4, 5): Team 2 PURIFY
-    board[5][4] = { ...makePiece(2, 2, "PURIFY", true), duration: 2 };
+    setCell(board, 5, 4, { ...makePiece(2, 2, "PURIFY", true), duration: 2 });
 
     const state = makeTestState(board, 1);
     const turn1 = dispatch(state, {
