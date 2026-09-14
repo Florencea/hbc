@@ -25,5 +25,8 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",
     stderr: "pipe",
+    env: {
+      BASE_PATH: "/",
+    },
   },
 });
