@@ -35,6 +35,9 @@ Guidelines for AI agents and human contributors working on the **`hbc`** reposit
   sanitizeForViewer(state: GameState, viewerPlayerId: number): MaskedGameState
   ```
 - An opponent should never be able to inspect unrevealed enemy skills via DOM or network inspection. Teammates can see unrevealed skills.
+- **Anti-Sonar Probing & Optimistic Fog-of-War Moves**:
+  - UI candidate move calculations (`getAvailableMoves`) and hover previews must be evaluated using `MaskedGameState` (viewer's sanitized state). Switching between `NONE` and `PIERCE` must never leak unrevealed enemy `WALL` positions via move indicators.
+  - The engine accepts optimistic standard moves: if a move is valid under the viewer's sanitized perspective but blocked by an unrevealed `WALL`, the piece is placed, the `WALL` is revealed (`PIECE_REVEALED`, reason `"BLOCK"`), `RAYCAST_BLOCKED` is emitted, 0 pieces are flipped, and the turn advances without throwing `IllegalMoveError`.
 
 ### React Compiler
 
@@ -66,6 +69,7 @@ Guidelines for AI agents and human contributors working on the **`hbc`** reposit
   5. `BOMB` 3x3 explosion and recursive chain reaction.
   6. `PURIFY` pulse aura and 3-turn lifespan decay.
   7. Fog of war sanitization for opponent and teammate perspectives.
+  8. Optimistic blind moves into hidden `WALL`s with 0 captures and anti-sonar sanitized move equivalence.
 
 ## 5. Verification Gate (Definition of Done)
 

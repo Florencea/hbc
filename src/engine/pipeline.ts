@@ -11,6 +11,7 @@ import {
   getPioneerMoves,
   isValidCoord,
 } from "./raycast.ts";
+import { sanitizeForViewer } from "./sanitize.ts";
 import {
   SKILL_SPECS,
   type Action,
@@ -358,70 +359,87 @@ export function dispatch(
   const capturedCoords: Coord[] = [...capturedMap.values()];
 
   if (capturedCoords.length === 0) {
-    const standardMoves = getLegalMoves(state, action.playerId, attackerSkill);
-    if (standardMoves.length > 0) {
-      throw new IllegalMoveError(
-        "Illegal move: must capture at least one piece",
-      );
-    }
-
-    const pioneerMoves = getPioneerMoves(state, action.playerId);
-    const isValidPioneer = pioneerMoves.some(
+    // Check if this move was an optimistic standard move blocked by hidden WALL(s)
+    const optimisticState = sanitizeForViewer(state, action.playerId);
+    const optimisticMoves = getLegalMoves(
+      optimisticState,
+      action.playerId,
+      attackerSkill,
+    );
+    const isOptimisticStandardMove = optimisticMoves.some(
       (c) => c.x === action.coord.x && c.y === action.coord.y,
     );
 
-    if (!isValidPioneer) {
-      throw new IllegalMoveError(
-        "Illegal pioneer move: target must be within 2 tiles of friendly territory",
+    if (!isOptimisticStandardMove) {
+      const standardMoves = getLegalMoves(
+        state,
+        action.playerId,
+        attackerSkill,
+      );
+      if (standardMoves.length > 0) {
+        throw new IllegalMoveError(
+          "Illegal move: must capture at least one piece",
+        );
+      }
+
+      const pioneerMoves = getPioneerMoves(state, action.playerId);
+      const isValidPioneer = pioneerMoves.some(
+        (c) => c.x === action.coord.x && c.y === action.coord.y,
+      );
+
+      if (!isValidPioneer) {
+        throw new IllegalMoveError(
+          "Illegal pioneer move: target must be within 2 tiles of friendly territory",
+        );
+      }
+
+      // Deduct skill if special piece
+      if (action.skillType && action.skillType !== "NONE") {
+        attacker.hand[action.skillType] -= 1;
+        attacker.isForcedSpecial = false;
+      }
+
+      // Place pioneer piece
+      const newPiece: Piece = {
+        teamId: attacker.teamId,
+        playerId: attacker.id,
+        skillType: attackerSkill,
+        isRevealed: isPurify || attackerSkill === "NONE",
+        duration: isPurify ? 3 : undefined,
+      };
+      setPiece(newBoard, action.coord.x, action.coord.y, newPiece);
+
+      events.push({
+        type: "PIECE_PLACED",
+        coord: action.coord,
+        piece: { ...newPiece },
+      });
+
+      events.push({
+        type: "PIONEER_PLACED",
+        coord: action.coord,
+        playerId: action.playerId,
+        piece: { ...newPiece },
+      });
+
+      if (isPurify) {
+        events.push({
+          type: "PIECE_REVEALED",
+          coord: action.coord,
+          skillType: "PURIFY",
+          reason: "AURA",
+        });
+      }
+
+      return finalizePlacementTurn(
+        state,
+        newBoard,
+        newPlayers,
+        attacker,
+        action.playerId,
+        events,
       );
     }
-
-    // Deduct skill if special piece
-    if (action.skillType && action.skillType !== "NONE") {
-      attacker.hand[action.skillType] -= 1;
-      attacker.isForcedSpecial = false;
-    }
-
-    // Place pioneer piece
-    const newPiece: Piece = {
-      teamId: attacker.teamId,
-      playerId: attacker.id,
-      skillType: attackerSkill,
-      isRevealed: isPurify || attackerSkill === "NONE",
-      duration: isPurify ? 3 : undefined,
-    };
-    setPiece(newBoard, action.coord.x, action.coord.y, newPiece);
-
-    events.push({
-      type: "PIECE_PLACED",
-      coord: action.coord,
-      piece: { ...newPiece },
-    });
-
-    events.push({
-      type: "PIONEER_PLACED",
-      coord: action.coord,
-      playerId: action.playerId,
-      piece: { ...newPiece },
-    });
-
-    if (isPurify) {
-      events.push({
-        type: "PIECE_REVEALED",
-        coord: action.coord,
-        skillType: "PURIFY",
-        reason: "AURA",
-      });
-    }
-
-    return finalizePlacementTurn(
-      state,
-      newBoard,
-      newPlayers,
-      attacker,
-      action.playerId,
-      events,
-    );
   }
 
   // Deduct skill for standard move
@@ -663,12 +681,14 @@ export function dispatch(
       }
     }
 
-    events.push({
-      type: "FLIP_BATCH",
-      coords: capturedCoords,
-      fromTeamIds,
-      toTeamId: attacker.teamId,
-    });
+    if (capturedCoords.length > 0) {
+      events.push({
+        type: "FLIP_BATCH",
+        coords: capturedCoords,
+        fromTeamIds,
+        toTeamId: attacker.teamId,
+      });
+    }
   }
 
   // 4. Phase 3: Process Bomb Chain Reactions via BFS queue

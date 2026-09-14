@@ -577,7 +577,11 @@ export default function App() {
   const availableMoves =
     gameMode === "PVE" && gameState.activePlayerId === 2
       ? { standardMoves: [], pioneerMoves: [], isPioneerActive: false }
-      : getAvailableMoves(gameState, gameState.activePlayerId, effectiveSkill);
+      : getAvailableMoves(
+          displayedState,
+          gameState.activePlayerId,
+          effectiveSkill,
+        );
 
   const standardMoveSet = new Set(
     availableMoves.standardMoves.map(
@@ -590,7 +594,7 @@ export default function App() {
     ),
   );
 
-  // Hover preview: preview board state after capturing pieces (assuming standard pieces)
+  // Hover preview: preview board state after capturing pieces (based on viewer perspective)
   const previewCapturedSet = (() => {
     if (
       !hoveredCoord ||
@@ -612,7 +616,7 @@ export default function App() {
       gameState.size,
       hoveredCoord,
       activePlayer?.teamId ?? 1,
-      "NONE",
+      effectiveSkill,
     );
 
     const set = new Set<string>();

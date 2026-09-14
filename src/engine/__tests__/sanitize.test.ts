@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getAvailableMoves } from "../raycast.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { GameState } from "../types.ts";
 import { createEmptyBoard, makePiece, setCell } from "./helpers.ts";
@@ -111,5 +112,81 @@ describe("sanitizeForViewer (Fog of War)", () => {
     // Friendly piece at (2, 2) shows true BOMB skill
     const allyPiece = sanitized.board[2]?.[2];
     expect(allyPiece?.skillType).toBe("BOMB");
+  });
+
+  it("prevents sonar probe: getAvailableMoves on sanitized state yields identical moves for NONE and PIERCE against unrevealed pieces", () => {
+    const freshBoard = createEmptyBoard(16);
+    // Unrevealed enemy WALL at (5, 5), friendly piece at (5, 6)
+    setCell(freshBoard, 5, 5, makePiece(2, 2, "WALL", false));
+    setCell(freshBoard, 5, 6, makePiece(1, 1, "NONE"));
+
+    const testState: GameState = {
+      board: freshBoard,
+      size: 16,
+      currentTurn: 1,
+      activePlayerId: 1,
+      players: [
+        {
+          id: 1,
+          teamId: 1,
+          name: "Player 1",
+          hand: {
+            NONE: Infinity,
+            WALL: 1,
+            PIERCE: 1,
+            BOMB: 1,
+            PURIFY: 1,
+            COUNTER: 1,
+          },
+          charge: {
+            NONE: 0,
+            WALL: 0,
+            PIERCE: 0,
+            BOMB: 0,
+            PURIFY: 0,
+            COUNTER: 0,
+          },
+          isForcedSpecial: false,
+        },
+        {
+          id: 2,
+          teamId: 2,
+          name: "Player 2",
+          hand: {
+            NONE: Infinity,
+            WALL: 0,
+            PIERCE: 0,
+            BOMB: 0,
+            PURIFY: 0,
+            COUNTER: 0,
+          },
+          charge: {
+            NONE: 0,
+            WALL: 0,
+            PIERCE: 0,
+            BOMB: 0,
+            PURIFY: 0,
+            COUNTER: 0,
+          },
+          isForcedSpecial: false,
+        },
+      ],
+      isGameOver: false,
+      winnerTeamId: null,
+      mapPreset: "CROSSROADS",
+      isDropPhase: false,
+      dropTurnsRemaining: 0,
+    };
+
+    const sanitized = sanitizeForViewer(testState, 1);
+
+    const movesNone = getAvailableMoves(sanitized, 1, "NONE");
+    const movesPierce = getAvailableMoves(sanitized, 1, "PIERCE");
+
+    // Under sanitized state, (4, 5) captures through (5, 5) for BOTH NONE and PIERCE
+    expect(movesNone.standardMoves).toEqual(movesPierce.standardMoves);
+    expect(movesNone.standardMoves.some((c) => c.x === 4 && c.y === 5)).toBe(
+      true,
+    );
   });
 });

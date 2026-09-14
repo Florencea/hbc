@@ -4,6 +4,7 @@ import type {
   Board,
   Coord,
   GameState,
+  MaskedGameState,
   RaycastResult,
   SkillType,
 } from "./types.ts";
@@ -113,7 +114,7 @@ export function collectAllRaycasts(
 }
 
 export function getLegalMoves(
-  state: GameState,
+  state: GameState | MaskedGameState,
   playerId: number,
   skillType: SkillType = "NONE",
 ): Coord[] {
@@ -156,7 +157,10 @@ export function getLegalMoves(
   return legalMoves;
 }
 
-export function getPioneerMoves(state: GameState, playerId: number): Coord[] {
+export function getPioneerMoves(
+  state: GameState | MaskedGameState,
+  playerId: number,
+): Coord[] {
   if (state.isGameOver) return [];
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return [];
@@ -201,7 +205,7 @@ export function getPioneerMoves(state: GameState, playerId: number): Coord[] {
 }
 
 export function getAvailableMoves(
-  state: GameState,
+  state: GameState | MaskedGameState,
   playerId: number,
   skillType: SkillType = "NONE",
 ): AvailableMoves {

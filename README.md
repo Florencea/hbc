@@ -13,11 +13,11 @@ A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend 
   ```ts
   dispatch(state: GameState, action: Action): { nextState: GameState; events: GameEvent[] }
   ```
-- **Information Security (Fog of War)**:
+- **Information Security (Fog of War) & Anti-Sonar Probing**:
   ```ts
   sanitizeForViewer(state: GameState, viewerPlayerId: number): MaskedGameState
   ```
-  Masks unrevealed enemy trap pieces to `NONE` on the client side to prevent DevTools inspection.
+  Masks unrevealed enemy trap pieces to `NONE` on the client side to prevent DevTools inspection. Client move indicators (`getAvailableMoves`) and hover previews strictly evaluate against sanitized states, preventing players from probing hidden `WALL` pieces by toggling `PIERCE`. The engine supports optimistic blind moves: placements perceived as legal that hit hidden walls resolve with wall reveals, 0 flips, and turn advances without throwing errors.
 - **5-Skill Variant System**:
   - `WALL`: Intercepts and blocks incoming raycasts (revealed upon blocking).
   - `PIERCE`: Penetrates `WALL` pieces and is immune to Bomb, Purify, and Counter traps.

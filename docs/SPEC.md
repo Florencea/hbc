@@ -14,7 +14,7 @@ HBC is a strategic multi-team variant of classic Reversi / Othello played on a 1
 - **Initial Setup**: Four center pieces placed in alternating diagonal formation at coordinates `(mid - 1, mid - 1)` to `(mid, mid)`.
 - **Turn Order**: Players take turns sequentially in a circular turn order (`(currentTurnIndex + 1) % players.length`).
 - **Sandwich Captures**: A placement at coordinate `(x, y)` projects raycasts in 8 directions (horizontal, vertical, diagonal). Pieces of any opposing team sandwiched between the placed piece and a friendly piece along an unbroken line are captured and converted to the active player's team and ownership.
-- **Move Legality**: A standard piece placement is legal only if it results in capturing at least one opposing piece (`capturedCoords.length > 0`).
+- **Move Legality**: A standard piece placement is legal only if it results in capturing at least one opposing piece (`capturedCoords.length > 0`), or if it is an optimistic legal move from the player's perspective under Fog of War that gets blocked by an unrevealed enemy `WALL`. If no standard or optimistic sandwich captures exist on the board, the player transitions to the Pioneer Phase.
 
 ---
 
@@ -91,6 +91,25 @@ Hidden information is a fundamental pillar of HBC. Players place special pieces 
 4. **Player Economy Fog of War**:
    - **Teammates / Allies**: Can inspect real-time hand stocks (`hand`), cooldown charges (`charge`), and forced discharge status (`isForcedSpecial`).
    - **Opponents**: All `hand` numbers, `charge` numbers, and `isForcedSpecial` flags are sanitized to `0` and `false`.
+
+### Anti-Sonar Probing & Client Sanitization
+
+To preserve hidden trap confidentiality and competitive balance:
+
+- **Anti-Sonar Guarantee**: All client-side candidate move computations (`getAvailableMoves`) and hover previews are strictly evaluated against the sanitized state (`displayedState = sanitizeForViewer(state, viewerId)`).
+- **Equivalent Move Candidates**: Because all unrevealed opponent pieces are masked to `skillType: "NONE"`, toggling between `NONE` and `PIERCE` produces identical move indicators on unrevealed opponent territory, preventing players from probing hidden `WALL` pieces beforehand.
+
+### Optimistic Blind Moves & Wall Collision Resolution (樂觀盲下碰壁機制)
+
+Under Fog of War, players act based on their perceived battlefield knowledge:
+
+1. **Optimistic Standard Move Validation**: If a move would capture at least one piece under the viewer's sanitized perspective (`isOptimisticStandardMove`), it is accepted by the engine.
+2. **Hidden Wall Interception**: When the real engine executes the raycast and hits an unrevealed enemy `WALL`:
+   - The placed piece remains on the board (`PIECE_PLACED`).
+   - The enemy `WALL` is revealed to all players (`PIECE_REVEALED` with `reason: "BLOCK"`), emitting `RAYCAST_BLOCKED` and triggering shield ripple VFX and `"翡翠城壁 格擋！"` floating combat text.
+   - If all projected rays are blocked, `capturedCoords.length === 0`, and no `FLIP_BATCH` event is emitted.
+   - The turn ends normally (consuming skill inventory if a special piece was used), and active turn passes to the next player.
+3. **Truly Illegal Moves**: Moves that cannot capture any piece even under the player's sanitized perspective (and are not valid Pioneer moves) continue to throw `IllegalMoveError`. Placements into known, already-revealed `WALL` pieces with non-piercing skills are also rejected.
 
 ---
 

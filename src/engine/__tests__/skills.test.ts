@@ -6,6 +6,7 @@ import {
   setCell,
 } from "./helpers.ts";
 import { dispatch, resolveAction } from "../pipeline.ts";
+import type { GameEvent } from "../types.ts";
 
 describe("Skill Engine Specification Suite (skills.test.ts)", () => {
   it("wall_blocks_raycast_and_reveals: A hidden WALL stops non-pierce flip line; wall becomes isRevealed = true", () => {
@@ -563,5 +564,110 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     // Converted to Team 1, retains PURIFY skill
     expect(turn1.nextState.board[5]?.[4]?.teamId).toBe(1);
     expect(turn1.nextState.board[5]?.[4]?.skillType).toBe("PURIFY");
+  });
+
+  it("optimistic_blind_move_blocked_by_hidden_wall_succeeds_with_zero_flips: blind move into hidden WALL succeeds, reveals WALL, blocks raycast, flips 0 pieces, and advances turn", () => {
+    const board = createEmptyBoard(16);
+    // Hidden enemy WALL at (2, 3), friendly piece at (2, 4).
+    // Attacker Team 1 places at (2, 2). Eastward ray is the ONLY ray for (2, 2).
+    setCell(board, 2, 3, makePiece(2, 2, "WALL", false));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
+
+    // Provide another independent standard move at (8, 8) so that standardMoves.length > 0 exists elsewhere:
+    // (8, 9) Team 2, (8, 10) Team 1
+    setCell(board, 8, 9, makePiece(2, 2, "NONE"));
+    setCell(board, 8, 10, makePiece(1, 1, "NONE"));
+
+    const state = makeTestState(board, 1);
+
+    // Player 1 drops NONE at (2, 2)
+    const { nextState, events } = resolveAction(state, {
+      type: "PLACE_PIECE",
+      playerId: 1,
+      coord: { x: 2, y: 2 },
+      skillType: "NONE",
+    });
+
+    // 1. Piece is placed successfully at (2, 2)
+    expect(nextState.board[2]?.[2]?.teamId).toBe(1);
+    expect(nextState.board[2]?.[2]?.skillType).toBe("NONE");
+
+    // 2. Hidden WALL at (2, 3) is revealed
+    const wallPiece = nextState.board[2]?.[3];
+    expect(wallPiece?.isRevealed).toBe(true);
+    expect(wallPiece?.skillType).toBe("WALL");
+    expect(wallPiece?.teamId).toBe(2);
+
+    // 3. Events contain PIECE_PLACED, PIECE_REVEALED (BLOCK), and RAYCAST_BLOCKED
+    expect(events.some((e) => e.type === "PIECE_PLACED")).toBe(true);
+    const wallRevealed = events.find(
+      (e): e is Extract<GameEvent, { type: "PIECE_REVEALED" }> =>
+        e.type === "PIECE_REVEALED" && e.coord.x === 3 && e.coord.y === 2,
+    );
+    expect(wallRevealed).toBeDefined();
+    expect(wallRevealed?.skillType).toBe("WALL");
+
+    const rayBlocked = events.find(
+      (e) => e.type === "RAYCAST_BLOCKED" && e.coord.x === 3 && e.coord.y === 2,
+    );
+    expect(rayBlocked).toBeDefined();
+
+    // 4. Zero pieces flipped: no FLIP_BATCH event
+    expect(events.some((e) => e.type === "FLIP_BATCH")).toBe(false);
+
+    // 5. Turn advanced to Player 2
+    expect(nextState.activePlayerId).toBe(2);
+  });
+
+  it("truly_illegal_move_still_rejected_under_optimistic_rules: move that has 0 captures even under sanitized perspective throws IllegalMoveError", () => {
+    const board = createEmptyBoard(16);
+    // Standard move exists at (8, 8): (8, 9) Team 2, (8, 10) Team 1
+    setCell(board, 8, 9, makePiece(2, 2, "NONE"));
+    setCell(board, 8, 10, makePiece(1, 1, "NONE"));
+
+    const state = makeTestState(board, 1);
+
+    // Player 1 drops at (0, 0), which has no alignment to any pieces
+    expect(() =>
+      resolveAction(state, {
+        type: "PLACE_PIECE",
+        playerId: 1,
+        coord: { x: 0, y: 0 },
+        skillType: "NONE",
+      }),
+    ).toThrow("Illegal move: must capture at least one piece");
+  });
+
+  it("revealed_wall_blocks_optimistic_move_for_non_pierce: move into a known revealed wall is not optimistic and throws IllegalMoveError", () => {
+    const board = createEmptyBoard(16);
+    // ALREADY REVEALED enemy WALL at (2, 3), friendly piece at (2, 4)
+    setCell(board, 2, 3, makePiece(2, 2, "WALL", true));
+    setCell(board, 2, 4, makePiece(1, 1, "NONE"));
+
+    // Standard move exists at (8, 8): (8, 9) Team 2, (8, 10) Team 1
+    setCell(board, 8, 9, makePiece(2, 2, "NONE"));
+    setCell(board, 8, 10, makePiece(1, 1, "NONE"));
+
+    const state = makeTestState(board, 1);
+
+    // Player 1 attempts to play NONE at (2, 2) - should be rejected since the wall is already revealed
+    expect(() =>
+      resolveAction(state, {
+        type: "PLACE_PIECE",
+        playerId: 1,
+        coord: { x: 2, y: 2 },
+        skillType: "NONE",
+      }),
+    ).toThrow("Illegal move: must capture at least one piece");
+
+    // But playing PIERCE at (2, 2) succeeds
+    const { nextState } = resolveAction(state, {
+      type: "PLACE_PIECE",
+      playerId: 1,
+      coord: { x: 2, y: 2 },
+      skillType: "PIERCE",
+    });
+    expect(nextState.board[2]?.[2]?.skillType).toBe("PIERCE");
+    expect(nextState.board[2]?.[3]?.teamId).toBe(1);
   });
 });
