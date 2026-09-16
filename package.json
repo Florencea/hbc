@@ -27,6 +27,7 @@
     "lint:fix": "eslint --fix",
     "lint:tailwind": "node scripts/lint-tailwind.ts",
     "lint:tailwind:fix": "node scripts/lint-tailwind.ts --fix",
+    "lint:workflows": "actionlint",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -68,6 +69,9 @@
     "node": "24.21.0"
   },
   "knip": {
+    "ignoreBinaries": [
+      "actionlint"
+    ],
     "ignoreDependencies": [
       "@tailwindcss/language-server"
     ],

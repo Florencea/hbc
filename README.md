@@ -75,6 +75,20 @@ For autonomous coding agents and automated CI environments, a specialized, zero-
 - `npm run agent:test:e2e`: Playwright headless browser smoke tests (with auto-build preview server).
 - `npm run agent:verify:gate`: Full fail-fast verification ladder (`agent:verify:inner` -> `agent:test:unit` -> `agent:test:e2e`).
 
+### CI/CD Pipeline Architecture
+
+The repository enforces a high-efficiency GitHub Actions automation strategy:
+
+1. **Daily CI Pipeline (`.github/workflows/ci.yml`)**:
+   - **Tier 1 (`gatekeeper`)**: Runs on `ubuntu-latest` against the authoritative Node.js runtime (`package.json` engines, v24 Active LTS). Executes clean installation (`npm ci`), browser dependencies (`playwright install --with-deps chromium`), static analysis, unit test suite, production build, and Playwright E2E smoke tests. On failure, Playwright traces and test artifacts are captured via `actions/upload-artifact@v7`.
+   - **Tier 2 (`platform-compat`)**: Executes upon Tier 1 success (`needs: [gatekeeper]`) across `windows-latest` and `macos-latest`. Validates native toolchain bindings (e.g. Rolldown, LightningCSS) and operating system path separator handling (`\` vs `/`) using `build` and unit tests, eliminating duplicate static analysis or heavy browser runners.
+2. **Upstream Runtime Canary (`.github/workflows/node-canary.yml`)**:
+   - Runs weekly via cron (`0 3 * * 1` - Mondays 03:00 UTC) and manual trigger (`workflow_dispatch`) on `ubuntu-latest`.
+   - Tests against upcoming Node.js 26 (Current line moving toward Active LTS in Oct 2026).
+   - Bypasses strict engine constraints (`--engine-strict=false`) and executes build and unit tests with `continue-on-error: true` to surface upstream diagnostics without breaking repository pass status.
+3. **Workflow Syntax & Expression Linting**:
+   - All workflow YAML files are strictly validated with `actionlint` to prevent syntax regressions and injection vulnerabilities.
+
 ## Available Scripts
 
 ### Human Ergonomics
@@ -89,6 +103,7 @@ For autonomous coding agents and automated CI environments, a specialized, zero-
 | `npm run lint`              | Run ESLint strict checks                              |
 | `npm run lint:tailwind`     | Check Tailwind classes for canonical formatting       |
 | `npm run lint:tailwind:fix` | Auto-fix Tailwind non-canonical classes               |
+| `npm run lint:workflows`    | Check GitHub Actions workflows with actionlint        |
 | `npm run format`            | Format files with Prettier                            |
 | `npm run format:check`      | Check file formatting with Prettier                   |
 | `npm run check:deadcode`    | Check for unused code and dependencies with Knip      |

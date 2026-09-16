@@ -133,6 +133,48 @@ Runs:
 
 All checks must pass with **0 errors and 0 warnings**.
 
+### CI/CD Pipeline Architecture & GitHub Actions Standards
+
+The repository enforces a two-tier verification gate in GitHub Actions:
+
+#### 1. Daily CI Pipeline (`.github/workflows/ci.yml`)
+
+- **Tier 1 (`gatekeeper`)**:
+  - **Runner**: `ubuntu-latest`.
+  - **Node Setup**: Dynamic resolution via `node-version-file: package.json` (Node 24 Active LTS authoritative baseline) with `cache: npm`.
+  - **Execution**: Clean install (`npm ci`), Playwright Chromium installation (`npx playwright install --with-deps chromium`), complete verification gate (`agent:verify:inner`, `format:check`, `check:deadcode`, `agent:test:unit`, `build`, `agent:test:e2e`).
+  - **Failure Forensics**: On E2E test failure, `actions/upload-artifact@v7` conditionally uploads traces and reports (`playwright-report-ubuntu-latest`, 7-day retention).
+- **Tier 2 (`platform-compat`)**:
+  - **Condition**: `needs: [gatekeeper]` (executes only after Tier 1 succeeds).
+  - **Matrix**: `os: [windows-latest, macos-latest]`.
+  - **Execution**: Clean install (`npm ci`), production build (`npm run build` to verify native compiler bindings such as Rolldown and LightningCSS), and unit tests (`npm run agent:test:unit` to verify path separators and runtime platform behaviors).
+  - **Isolation**: Strictly avoids duplicate static analysis, linting, or heavy E2E execution on secondary OS runners.
+
+#### 2. Upstream Runtime Canary (`.github/workflows/node-canary.yml`)
+
+- **Schedule**: Weekly cron (`0 3 * * 1` - Mondays 03:00 UTC) + `workflow_dispatch`.
+- **Target**: Upcoming Node.js 26 (Current release line moving toward Active LTS in October 2026).
+- **Resilience**: Bypasses repository engine constraints (`npm ci --engine-strict=false` and `NPM_CONFIG_ENGINE_STRICT=false`). Build and unit test steps run with `continue-on-error: true` so upstream diagnostic regressions surface without failing repository pass status badges.
+
+#### 3. Workflow Modifications & Actionlint Validation
+
+- Any addition or modification to workflow definitions in `.github/workflows/*.yml` must be statically validated using `actionlint`:
+  ```bash
+  npm run lint:workflows
+  # or directly: actionlint
+  ```
+- Workflow files must strictly pass with **0 errors and 0 warnings**.
+
+#### 4. CI Artifact & Cache Isolation Policy
+
+- Custom or runner caching directories such as `.cache/` (e.g. Playwright browser binaries or toolchain caches) must remain strictly ignored across `.gitignore`, `.prettierignore`, and `eslint.config.ts` (`globalIgnores`). This prevents restored CI caches from causing unexpected `format:check` or lint failures.
+
+#### 5. CI Failure-Handling Procedures
+
+- **Tier 1 (`gatekeeper`) Failures**: If E2E fails, download the `playwright-report-ubuntu-latest` artifact from the GitHub Actions run summary to inspect step-by-step traces, DOM snapshots, and screenshots.
+- **Tier 2 (`platform-compat`) Failures**: Inspect native compiler binding resolution (Rolldown / LightningCSS) or OS path separator assumptions (`\` vs `/`).
+- **Canary Failures**: Review warning annotations in weekly Node 26 runs to plan ahead for upcoming Node LTS deprecations or native module breaking changes.
+
 ## 6. Localization & UI Terminology Standards (繁體中文規範)
 
 All user-facing UI text, skill descriptions, combat notifications, and telemetry indicators must consistently use Traditional Chinese (繁體中文).

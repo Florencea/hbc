@@ -28,3 +28,4 @@ dist-ssr
 .vitest
 test-results
 playwright-report
+.cache
