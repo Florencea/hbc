@@ -27,6 +27,19 @@ A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend 
 - **React Compiler**: Automatic fine-grained memoization via React Compiler.
 - **TailwindCSS v4**: Design tokens defined in `src/global.css` (@theme) and validated via custom Oxide scanner.
 
+## Roadmap & Milestones
+
+- [x] **Phase 1: 5-Skill Interaction Matrix & BFS Queue** — WALL, PIERCE, BOMB, PURIFY, COUNTER resolution pipeline.
+- [x] **Phase 2: Player Hand Economy & Cooldown Ticking** — Dynamic inventory caps, energy charging, and forced special discharge.
+- [x] **Phase 3: Map Presets & Drop Phase** — Crossroads, Archipelago, and Trenches procedural templates with drop zones.
+- [x] **Phase 4: Pioneer Placement Mechanics** — Chebyshev distance \(\le 2\) bridge building across open battlefield spaces.
+- [x] **Phase 5: Anti-Sonar Fog of War & VFX Choreography** — Client sanitization, optimistic blind moves, and floating combat text.
+- [x] **Phase 6: Heuristic Bot & Game Modes** — 1-ply positional heuristic bot with PVP, PVE, and AI vs AI spectator modes.
+- [ ] **Phase 7: AI Depth Search & Trap Risk Modeling** — 2-ply Minimax with Alpha-Beta pruning, trap risk heuristics, and pioneer safety. _(In Progress)_
+- [ ] **Phase 8: Match History & Visual Replay System** — PGN-like event stream serialization and step-by-step playback controls.
+- [ ] **Phase 9: Multi-Team Scaling** — 1v1v1 Triangle Board and 2v2 Shared Vision Team Mode.
+- [ ] **Phase 10: Peer-to-Peer / WebSocket Networking** — Headless game server room orchestration and live multiplayer synchronization.
+
 ## Quick Start
 
 ```bash

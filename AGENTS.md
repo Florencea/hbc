@@ -50,6 +50,12 @@ Guidelines for AI agents and human contributors working on the **`hbc`** reposit
 - Tailwind CSS v4 `@theme` in `src/global.css` is the source of truth for design tokens.
 - Use Tailwind CSS v4 canonical class syntax. Run `npm run lint:tailwind` to diagnose non-canonical classes and `npm run lint:tailwind:fix` to format them.
 
+### AI & Performance Architecture Guidelines
+
+- **AI Engine Isolation**: AI evaluation functions (`selectBestMove`, `selectBestMoveMinimax`) must remain headless, synchronous or Web-Worker-compatible, and operate strictly on sanitized states (`sanitizeForViewer`) to prevent any information leaks.
+- **Search Time Budget**: Search depth algorithms (Minimax with Alpha-Beta pruning) must enforce branch pruning or evaluation limits to stay strictly under 350ms per turn in both Node and browser execution environments.
+- **Asynchronous Engine Evolution**: Prepare architecture for serializable actions and state snapshots to support future undo/redo and match replay features without in-place state mutation.
+
 ## 3. Strict Coding Standards
 
 - **No `any`**: Always provide accurate TypeScript types, discriminated unions, or generics.

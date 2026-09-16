@@ -258,3 +258,23 @@ To solve the "island isolation / gridlock" issue on sparse and sprawling battlef
 ### Pass Fallback
 
 If a player has 0 standard captures and 0 pioneer moves (e.g. completely surrounded or no friendly pieces), the player must pass their turn (`PASS_TURN`).
+
+---
+
+## 9. Project Status & Future Roadmap
+
+### Current Completed Core
+
+- **Phase 1**: 5-Skill Interaction Matrix & BFS Event Resolution Queue.
+- **Phase 2**: Player Hand Economy, Cooldown Ticking, and Cap Freeze Rule.
+- **Phase 3**: Map Presets (Crossroads, Archipelago, Trenches) & Drop Phase.
+- **Phase 4**: Pioneer Placement (Chebyshev distance <= 2 bridge building).
+- **Phase 5**: Anti-Sonar Fog of War, Optimistic Blind Moves, and VFX Choreography.
+- **Phase 6**: 1-ply Heuristic Bot & Game Modes (PVP, PVE, AI vs AI).
+
+### Future Roadmap Milestones
+
+- **Phase 7 (Active)**: Minimax Depth Search (Alpha-Beta Pruning) & Fog-of-War Risk Modeling.
+- **Phase 8**: Match History & Visual Replay System (PGN-like event serialization).
+- **Phase 9**: Multi-Team Scaling (1v1v1 Triangle Board & 2v2 Shared Vision Team Mode).
+- **Phase 10**: Peer-to-Peer / WebSocket Headless Server Room Synchronization.

@@ -22,6 +22,7 @@ import {
   selectBestMove,
   SKILL_SPECS,
   type Action,
+  type AIDifficulty,
   type Board,
   type Coord,
   type GameEvent,
@@ -434,6 +435,8 @@ export default function App() {
   const [gameMode, setGameMode] = useState<GameMode>("PVE");
   const [isAiPlaying, setIsAiPlaying] = useState<boolean>(true);
   const [aiSpeed, setAiSpeed] = useState<"NORMAL" | "FAST">("NORMAL");
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("MEDIUM");
+
   const [showGameOverModal, setShowGameOverModal] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => isAudioMuted());
   const [eventLogs, setEventLogs] = useState<GameEvent[]>(
@@ -503,7 +506,7 @@ export default function App() {
   const aiAction: Action | null = (() => {
     if (gameState.isGameOver || !isCurrentPlayerAi) return null;
     try {
-      return selectBestMove(gameState, gameState.activePlayerId, "MEDIUM");
+      return selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
     } catch {
       return null;
     }
@@ -908,7 +911,7 @@ export default function App() {
       try {
         const action =
           aiAction ??
-          selectBestMove(gameState, gameState.activePlayerId, "MEDIUM");
+          selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
         const { nextState, events } = dispatch(gameState, action);
         void executeEventChoreography(nextState, events);
       } catch (err) {
@@ -936,6 +939,7 @@ export default function App() {
     isCurrentPlayerAi,
     isAiPlaying,
     aiSpeed,
+    aiDifficulty,
     gameState,
     isAnimating,
     aiAction,
@@ -947,7 +951,7 @@ export default function App() {
     try {
       const action =
         aiAction ??
-        selectBestMove(gameState, gameState.activePlayerId, "MEDIUM");
+        selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
       const { nextState, events } = dispatch(gameState, action);
       void executeEventChoreography(nextState, events);
     } catch (err) {
@@ -1846,6 +1850,45 @@ export default function App() {
                 跳過回合
               </button>
             </div>
+
+            {/* AI Difficulty Selector (Visible in PVE and AI_VS_AI modes) */}
+            {(gameMode === "PVE" || gameMode === "AI_VS_AI") && (
+              <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5">
+                <span className="text-xs text-slate-400">AI 難度：</span>
+                <div className="flex rounded-md border border-slate-800 bg-slate-900 p-0.5 shadow-inner">
+                  {(
+                    [
+                      { id: "EASY", label: "簡單 (EASY)" },
+                      { id: "MEDIUM", label: "普通 (MEDIUM)" },
+                      { id: "HARD", label: "困難 (HARD)" },
+                    ] as const
+                  ).map(({ id, label }) => {
+                    const isSelected = aiDifficulty === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          setAiDifficulty(id);
+                        }}
+                        disabled={isAnimating}
+                        className={`cursor-pointer rounded px-2 py-1 text-[11px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isSelected
+                            ? id === "HARD"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : id === "MEDIUM"
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "bg-emerald-600 text-white shadow-xs"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Game Phase & Drop Zone Status */}
             <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2.5 text-xs text-slate-400">
