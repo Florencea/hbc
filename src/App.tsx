@@ -12,9 +12,13 @@ import {
   FloatingCombatText,
   type CombatTextItem,
 } from "./components/FloatingCombatText.tsx";
+import { ReplayControls } from "./components/ReplayControls.tsx";
+import { ExportModal, ImportModal } from "./components/ReplayModals.tsx";
 import {
   collectAllRaycasts,
   createInitialGame,
+  createMatchTracker,
+  createReplaySession,
   dispatch,
   getAvailableMoves,
   isWithinDropZone,
@@ -29,8 +33,11 @@ import {
   type GameState,
   type MapPreset,
   type MaskedPiece,
+  type MatchHistory,
+  type MatchTracker,
   type Piece,
   type Player,
+  type ReplaySession,
   type SkillType,
 } from "./engine/index.ts";
 import { playEvents } from "./fx/choreography.ts";
@@ -365,7 +372,7 @@ function formatErrorMessage(msg: string): string {
 interface ToastNotification {
   key: number;
   message: string;
-  type: "error" | "info" | "warning";
+  type: "error" | "info" | "warning" | "success";
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -457,7 +464,7 @@ export default function App() {
 
   const handleShowToast = (
     message: string,
-    type: "error" | "info" | "warning" = "error",
+    type: "error" | "info" | "warning" | "success" = "error",
   ) => {
     setToast((prev) => ({
       key: (prev?.key ?? 0) + 1,
@@ -465,6 +472,25 @@ export default function App() {
       type,
     }));
   };
+
+  // Match history tracking and visual replay states
+  const [matchTracker] = useState<MatchTracker>(() =>
+    createMatchTracker(
+      createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).state,
+    ),
+  );
+  const [recordedTurns, setRecordedTurns] = useState<number>(0);
+  const [isReplayMode, setIsReplayMode] = useState<boolean>(false);
+  const [replaySession, setReplaySession] = useState<ReplaySession | null>(
+    null,
+  );
+  const [replayIndex, setReplayIndex] = useState<number>(-1);
+  const [isReplayAutoPlaying, setIsReplayAutoPlaying] =
+    useState<boolean>(false);
+  const [replaySpeed, setReplaySpeed] = useState<"0.5x" | "1x" | "2x">("1x");
+  const [replayViewerId, setReplayViewerId] = useState<number | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
   // Animation and Visual FX states
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
@@ -546,21 +572,30 @@ export default function App() {
 
   const viewerTeamId = gameMode === "PVE" ? 1 : (activePlayer?.teamId ?? 1);
 
-  const currentBoard: (Piece | MaskedPiece | null)[][] = intermediateBoard
-    ? isGodMode && gameMode !== "PVE"
-      ? intermediateBoard
-      : intermediateBoard.map((row) =>
-          row.map((piece) => {
-            if (!piece) return null;
-            if (piece.isRevealed) return piece;
-            if (piece.teamId === viewerTeamId) return piece;
-            return { ...piece, skillType: "NONE" };
-          }),
-        )
-    : displayedState.board;
+  const replayState =
+    isReplayMode && replaySession
+      ? replaySession.getCurrentMaskedState(replayViewerId)
+      : null;
 
-  const player1 = displayedState.players.find((p) => p.teamId === 1);
-  const player2 = displayedState.players.find((p) => p.teamId === 2);
+  const currentBoard: (Piece | MaskedPiece | null)[][] = replayState
+    ? replayState.board
+    : intermediateBoard
+      ? isGodMode && gameMode !== "PVE"
+        ? intermediateBoard
+        : intermediateBoard.map((row) =>
+            row.map((piece) => {
+              if (!piece) return null;
+              if (piece.isRevealed) return piece;
+              if (piece.teamId === viewerTeamId) return piece;
+              return { ...piece, skillType: "NONE" };
+            }),
+          )
+      : displayedState.board;
+
+  const effectiveDisplayedState = replayState ?? displayedState;
+
+  const player1 = effectiveDisplayedState.players.find((p) => p.teamId === 1);
+  const player2 = effectiveDisplayedState.players.find((p) => p.teamId === 2);
 
   const player1SpecialsCount =
     (player1?.hand.WALL ?? 0) +
@@ -576,9 +611,9 @@ export default function App() {
     (player2?.hand.PURIFY ?? 0) +
     (player2?.hand.COUNTER ?? 0);
 
-  // In PVE mode during bot's turn, do not show computer's possible legal moves
+  // In PVE mode during bot's turn or in replay mode, do not show legal move indicators
   const availableMoves =
-    gameMode === "PVE" && gameState.activePlayerId === 2
+    isReplayMode || (gameMode === "PVE" && gameState.activePlayerId === 2)
       ? { standardMoves: [], pioneerMoves: [], isPioneerActive: false }
       : getAvailableMoves(
           displayedState,
@@ -600,6 +635,7 @@ export default function App() {
   // Hover preview: preview board state after capturing pieces (based on viewer perspective)
   const previewCapturedSet = (() => {
     if (
+      isReplayMode ||
       !hoveredCoord ||
       isAnimating ||
       gameState.isGameOver ||
@@ -632,7 +668,11 @@ export default function App() {
   })();
 
   const executeEventChoreography = useCallback(
-    async (nextState: GameState, events: GameEvent[]) => {
+    async (nextState: GameState, events: GameEvent[], action: Action) => {
+      // Record step into live match history
+      matchTracker.recordStep(action, nextState, events);
+      setRecordedTurns(matchTracker.getHistory().steps.length);
+
       if (events.length === 0) {
         setGameState(nextState);
         setSelectedSkill((prev) =>
@@ -897,7 +937,7 @@ export default function App() {
         setIntermediateBoard(null);
       }
     },
-    [gameState.board, gameState.size, isHumanTurn],
+    [gameState.board, gameState.size, isHumanTurn, matchTracker],
   );
 
   // Automated AI turn execution for PVE (Bot turn) or AI_VS_AI (Both turns)
@@ -913,18 +953,19 @@ export default function App() {
           aiAction ??
           selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
         const { nextState, events } = dispatch(gameState, action);
-        void executeEventChoreography(nextState, events);
+        void executeEventChoreography(nextState, events, action);
       } catch (err) {
         if (err instanceof Error) {
           handleShowToast(formatErrorMessage(err.message), "error");
         }
         // Failsafe: pass turn if AI action encounters an error to prevent game stall
         try {
-          const { nextState, events } = dispatch(gameState, {
+          const passAction: Action = {
             type: "PASS_TURN",
             playerId: gameState.activePlayerId,
-          });
-          void executeEventChoreography(nextState, events);
+          };
+          const { nextState, events } = dispatch(gameState, passAction);
+          void executeEventChoreography(nextState, events, passAction);
         } catch {
           // If pass also fails, state remains
         }
@@ -953,17 +994,18 @@ export default function App() {
         aiAction ??
         selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
       const { nextState, events } = dispatch(gameState, action);
-      void executeEventChoreography(nextState, events);
+      void executeEventChoreography(nextState, events, action);
     } catch (err) {
       if (err instanceof Error) {
         handleShowToast(formatErrorMessage(err.message), "error");
       }
       try {
-        const { nextState, events } = dispatch(gameState, {
+        const passAction: Action = {
           type: "PASS_TURN",
           playerId: gameState.activePlayerId,
-        });
-        void executeEventChoreography(nextState, events);
+        };
+        const { nextState, events } = dispatch(gameState, passAction);
+        void executeEventChoreography(nextState, events, passAction);
       } catch {
         // Failsafe
       }
@@ -971,6 +1013,7 @@ export default function App() {
   };
 
   const handleCellClick = (coord: Coord) => {
+    if (isReplayMode) return;
     if (isAnimating) return;
     if (gameMode === "AI_VS_AI") {
       handleShowToast(
@@ -982,13 +1025,14 @@ export default function App() {
     if (gameMode === "PVE" && gameState.activePlayerId === 2) return;
 
     try {
-      const { nextState, events } = dispatch(gameState, {
+      const placeAction: Action = {
         type: "PLACE_PIECE",
         playerId: gameState.activePlayerId,
         coord,
         skillType: effectiveSkill,
-      });
-      void executeEventChoreography(nextState, events);
+      };
+      const { nextState, events } = dispatch(gameState, placeAction);
+      void executeEventChoreography(nextState, events, placeAction);
     } catch (err) {
       if (err instanceof Error) {
         handleShowToast(formatErrorMessage(err.message), "error");
@@ -997,7 +1041,14 @@ export default function App() {
   };
 
   const handlePassTurn = () => {
-    if (isAnimating || isCurrentPlayerAi || gameState.isGameOver) return;
+    if (
+      isReplayMode ||
+      isAnimating ||
+      isCurrentPlayerAi ||
+      gameState.isGameOver
+    ) {
+      return;
+    }
     if (
       availableMoves.standardMoves.length > 0 ||
       availableMoves.pioneerMoves.length > 0
@@ -1006,11 +1057,12 @@ export default function App() {
       return;
     }
     try {
-      const { nextState, events } = dispatch(gameState, {
+      const passAction: Action = {
         type: "PASS_TURN",
         playerId: gameState.activePlayerId,
-      });
-      void executeEventChoreography(nextState, events);
+      };
+      const { nextState, events } = dispatch(gameState, passAction);
+      void executeEventChoreography(nextState, events, passAction);
     } catch (err) {
       if (err instanceof Error) {
         handleShowToast(formatErrorMessage(err.message), "error");
@@ -1027,6 +1079,11 @@ export default function App() {
     setEventLogs(initial.events);
     setSelectedSkill("NONE");
     setShowGameOverModal(false);
+    matchTracker.reset(initial.state);
+    setRecordedTurns(0);
+    setIsReplayMode(false);
+    setReplaySession(null);
+    setIsReplayAutoPlaying(false);
   };
 
   const handleReset = () => {
@@ -1040,8 +1097,67 @@ export default function App() {
     setEventLogs(initial.events);
     setSelectedSkill("NONE");
     setShowGameOverModal(false);
+    matchTracker.reset(initial.state);
+    setRecordedTurns(0);
+    setIsReplayMode(false);
+    setReplaySession(null);
+    setIsReplayAutoPlaying(false);
     handleShowToast("對局已重設", "info");
   };
+
+  const handleOpenReplay = (targetIndex?: number) => {
+    const history = matchTracker.getHistory();
+    const session = createReplaySession(
+      history,
+      targetIndex ?? history.steps.length - 1,
+    );
+    setReplaySession(session);
+    setReplayIndex(session.getCurrentIndex());
+    setIsReplayAutoPlaying(false);
+    setIsReplayMode(true);
+  };
+
+  const handleExitReplay = () => {
+    setIsReplayAutoPlaying(false);
+    setIsReplayMode(false);
+    setReplaySession(null);
+  };
+
+  const handleImportSuccess = (importedHistory: MatchHistory) => {
+    const session = createReplaySession(
+      importedHistory,
+      importedHistory.steps.length - 1,
+    );
+    setReplaySession(session);
+    setReplayIndex(session.getCurrentIndex());
+    setIsReplayAutoPlaying(false);
+    setIsReplayMode(true);
+  };
+
+  const handleReplayStepChange = (index: number) => {
+    if (!replaySession) return;
+    replaySession.jumpToStep(index);
+    setReplayIndex(replaySession.getCurrentIndex());
+  };
+
+  useEffect(() => {
+    if (!isReplayMode || !isReplayAutoPlaying || !replaySession) return;
+
+    const intervalMs =
+      replaySpeed === "0.5x" ? 1200 : replaySpeed === "1x" ? 600 : 300;
+    const timer = setInterval(() => {
+      if (replaySession.canStepForward()) {
+        replaySession.stepForward();
+        setReplayIndex(replaySession.getCurrentIndex());
+      } else {
+        setIsReplayAutoPlaying(false);
+      }
+    }, intervalMs);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isReplayMode, isReplayAutoPlaying, replaySession, replaySpeed]);
 
   // Team piece count
   const neutralCount = currentBoard
@@ -1062,7 +1178,9 @@ export default function App() {
                 ? "border-rose-500/80 bg-rose-950/95 text-rose-100 shadow-rose-950/50"
                 : toast.type === "warning"
                   ? "border-amber-500/80 bg-amber-950/95 text-amber-100 shadow-amber-950/50"
-                  : "border-sky-500/80 bg-sky-950/95 text-sky-100 shadow-sky-950/50"
+                  : toast.type === "success"
+                    ? "border-emerald-500/80 bg-emerald-950/95 text-emerald-100 shadow-emerald-950/50"
+                    : "border-sky-500/80 bg-sky-950/95 text-sky-100 shadow-sky-950/50"
             }`}
           >
             <span>
@@ -1070,7 +1188,9 @@ export default function App() {
                 ? "⚠️"
                 : toast.type === "warning"
                   ? "⚡"
-                  : "ℹ️"}
+                  : toast.type === "success"
+                    ? "✅"
+                    : "ℹ️"}
             </span>
             <span>{toast.message}</span>
             <button
@@ -1218,7 +1338,7 @@ export default function App() {
             </div>
 
             {/* Action Buttons */}
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-2.5">
               <button
                 type="button"
                 onClick={handleReset}
@@ -1230,8 +1350,27 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   setShowGameOverModal(false);
+                  handleOpenReplay(0);
                 }}
-                className="flex-1 cursor-pointer rounded-lg border border-slate-700 bg-slate-800 py-2.5 text-center text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+                className="flex-1 cursor-pointer rounded-lg border border-indigo-500/80 bg-indigo-600/90 py-2.5 text-center text-xs font-bold text-white shadow-md transition-colors hover:bg-indigo-500"
+              >
+                🎬 觀看重播
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExportModalOpen(true);
+                }}
+                className="cursor-pointer rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-center text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+              >
+                📥 匯出
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGameOverModal(false);
+                }}
+                className="cursor-pointer rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-center text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
               >
                 🔍 檢視棋盤
               </button>
@@ -1388,6 +1527,58 @@ export default function App() {
           >
             重設對局
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (isReplayMode) {
+                handleExitReplay();
+              } else {
+                handleOpenReplay();
+              }
+            }}
+            disabled={isAnimating || recordedTurns === 0}
+            title={
+              recordedTurns === 0
+                ? "尚無已下棋步可回放"
+                : isReplayMode
+                  ? "結束回放模式"
+                  : "進入對局重播模式"
+            }
+            className={`cursor-pointer rounded px-3 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
+              isReplayMode
+                ? "border border-indigo-400 bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400"
+                : "border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+            }`}
+          >
+            🎬 {isReplayMode ? "結束回放" : "對局回放"}
+            {recordedTurns > 0 ? ` (${recordedTurns.toString()})` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsExportModalOpen(true);
+            }}
+            disabled={isAnimating || recordedTurns === 0}
+            title={
+              recordedTurns === 0
+                ? "尚無已下棋步可匯出"
+                : "匯出 HBC-PGN / JSON 棋譜"
+            }
+            className="cursor-pointer rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            📥 匯出
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsImportModalOpen(true);
+            }}
+            disabled={isAnimating}
+            title="載入 HBC-PGN 或 JSON 外部棋譜"
+            className="cursor-pointer rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            📤 載入
+          </button>
         </div>
       </header>
 
@@ -1442,9 +1633,45 @@ export default function App() {
       <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left Side: Game Board */}
         <section className="flex flex-col items-center lg:col-span-8">
+          {/* Visual Replay Controls Panel when Replay Mode is active */}
+          {isReplayMode && replaySession && (
+            <ReplayControls
+              session={replaySession}
+              replayIndex={replayIndex}
+              isPlaying={isReplayAutoPlaying}
+              speed={replaySpeed}
+              viewerId={replayViewerId}
+              onStepChange={handleReplayStepChange}
+              onTogglePlay={() => {
+                setIsReplayAutoPlaying((prev) => !prev);
+              }}
+              onSpeedChange={setReplaySpeed}
+              onViewerChange={setReplayViewerId}
+              onExitReplay={handleExitReplay}
+              onOpenExport={() => {
+                setIsExportModalOpen(true);
+              }}
+            />
+          )}
+
           {/* Consolidated Battlefield Status Bar - Stable height prevents board jitter */}
           <div className="mb-3 flex min-h-12 w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-4 py-2 text-xs shadow-sm">
-            {gameState.isGameOver ? (
+            {isReplayMode ? (
+              <div className="flex items-center gap-2 text-indigo-300">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                </span>
+                <span className="font-bold tracking-wider">
+                  對局重播進行中：
+                </span>
+                <span className="text-slate-200">
+                  {replayIndex === -1
+                    ? "初始盤面（Turn 0）"
+                    : `第 ${(replayIndex + 1).toString()} 手 · ${replaySession?.getCurrentStep()?.notation ?? ""}`}
+                </span>
+              </div>
+            ) : gameState.isGameOver ? (
               <div className="flex items-center gap-2 text-amber-300">
                 <span className="text-base">🏆</span>
                 <span className="font-bold tracking-wider">
@@ -1533,7 +1760,20 @@ export default function App() {
 
             {/* Right Status Badge */}
             <div className="flex shrink-0 items-center gap-2">
-              {gameState.isGameOver ? (
+              {isReplayMode ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded border border-indigo-500/40 bg-indigo-950/60 px-2 py-0.5 font-mono text-[11px] font-bold text-indigo-300 ring-1 ring-indigo-500/40">
+                    🎬 重播進行中
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleExitReplay}
+                    className="cursor-pointer rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-300 hover:bg-slate-700"
+                  >
+                    返回對局
+                  </button>
+                </div>
+              ) : gameState.isGameOver ? (
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -2529,6 +2769,26 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      {/* Export & Import Modals for Phase 8 HBC-PGN / JSON Replay */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => {
+          setIsExportModalOpen(false);
+        }}
+        history={
+          replaySession ? replaySession.getHistory() : matchTracker.getHistory()
+        }
+        onShowToast={handleShowToast}
+      />
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          setIsImportModalOpen(false);
+        }}
+        onImportSuccess={handleImportSuccess}
+        onShowToast={handleShowToast}
+      />
     </div>
   );
 }

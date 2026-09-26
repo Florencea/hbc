@@ -271,10 +271,49 @@ If a player has 0 standard captures and 0 pioneer moves (e.g. completely surroun
 - **Phase 4**: Pioneer Placement (Chebyshev distance <= 2 bridge building).
 - **Phase 5**: Anti-Sonar Fog of War, Optimistic Blind Moves, and VFX Choreography.
 - **Phase 6**: 1-ply Heuristic Bot & Game Modes (PVP, PVE, AI vs AI).
+- **Phase 7**: Minimax Depth Search (Alpha-Beta Pruning) & Fog-of-War Risk Modeling.
+- **Phase 8**: Match History & Visual Replay System (HBC-PGN serialization and step playback).
 
 ### Future Roadmap Milestones
 
-- **Phase 7 (Active)**: Minimax Depth Search (Alpha-Beta Pruning) & Fog-of-War Risk Modeling.
-- **Phase 8**: Match History & Visual Replay System (PGN-like event serialization).
-- **Phase 9**: Multi-Team Scaling (1v1v1 Triangle Board & 2v2 Shared Vision Team Mode).
+- **Phase 9 (Active)**: Multi-Team Scaling (1v1v1 Triangle Board & 2v2 Shared Vision Team Mode).
 - **Phase 10**: Peer-to-Peer / WebSocket Headless Server Room Synchronization.
+
+---
+
+## 10. Match History, PGN Serialization & Visual Replay System (對局歷史與重播系統)
+
+Phase 8 introduces event stream recording, PGN-style notation serialization, and step-by-step interactive replay controls for post-match analysis.
+
+### 1. HBC-PGN Notation Specification
+
+Similar to Chess PGN, HBC-PGN represents game metadata in tag pairs and actions with algebraic coordinates and event outcome annotations:
+
+- **Algebraic Coordinates**:
+  - Columns: `A` through `P` (0 to 15).
+  - Rows: `1` through `16` (1-indexed).
+  - Examples: `A1` is `(0, 0)`, `H8` is `(7, 7)`, `P16` is `(15, 15)`.
+- **Move Tokens**:
+  - Piece placement: `P<playerId>:<Coord>[<SkillType>]` (e.g. `P1:H8[NONE]`, `P2:I8[WALL]`).
+  - Pass turn: `P<playerId>:PASS`.
+- **Event Annotations `{...}`**:
+  - `flips:N`: Number of sandwiched opponent pieces captured and flipped.
+  - `block:1`: Non-piercing raycast blocked by a hidden enemy `WALL`.
+  - `penetrate:1`: Unrevealed `PIERCE` penetrated a `WALL` or trap.
+  - `bomb:N(K)`: `N` bomb detonations affecting `K` tiles.
+  - `counter:N(K)`: `N` counter backlashes reversing `K` captured tiles.
+  - `purify:N(K)`: `N` purify pulses converting `K` tiles without triggering traps.
+  - `pioneer:1`: Pioneer placement bridge step across open space.
+
+### 2. Serialization & Deterministic Reconstruction
+
+1. **Structured JSON**: Captures `MatchMetadata`, initial state, and complete `stateSnapshot` per step to enable $O(1)$ instantaneous scrubber jumps. Preserves `Infinity` hand values via dedicated serialization revivers.
+2. **Deterministic Replay (`replayMatchActions`)**: Given map preset, board size, and an ordered action sequence, pure state transitions re-execute sequentially through `dispatch(state, action)`, reproducing identical states and event streams.
+
+### 3. Visual Replay Controller (`ReplaySession`)
+
+- **Bidirectional Stepping**: Support for stepping forward, stepping backward, jumping to initial layout (Turn 0), and jumping to match conclusion.
+- **Fog of War Perspective in Replay**: Allows analyzing the match from:
+  - `上帝視角（全揭示）`: Displays all hidden traps and opponent hands.
+  - `黑方視角` / `白方視角`: Renders the board as perceived by that specific player using `sanitizeForViewer`.
+- **Interactive Scrubber & Variable Speed Playback**: Direct timeline slider navigation with `0.5x`, `1x`, and `2x` auto-playback speeds.
