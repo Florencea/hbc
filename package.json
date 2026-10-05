@@ -4,13 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
-    "build": "vp build",
-    "preview": "vp preview",
-    "check": "vp check",
-    "lint": "vp lint",
-    "fmt": "vp fmt",
-    "test": "vp test",
     "agent:lint:ci": "actionlint",
     "agent:lint:fix": "vp check --fix && node scripts/lint-tailwind.ts --fix",
     "agent:lint:tailwind": "node scripts/lint-tailwind.ts",

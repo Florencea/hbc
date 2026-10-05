@@ -43,8 +43,8 @@ A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend 
 ## Quick Start
 
 ```bash
-npm install
-npm run dev
+vp install
+vp dev
 ```
 
 ## Verification Gates
@@ -102,36 +102,35 @@ The repository enforces a high-efficiency GitHub Actions automation strategy:
 3. **Workflow Syntax & Expression Linting**:
    - All workflow YAML files are strictly validated with `actionlint` to prevent syntax regressions and injection vulnerabilities.
 
-## Available Scripts
+## Available Commands & Scripts
 
-### Human Ergonomics
+### Vite+ Native Commands
 
-| Script                      | Description                                           |
-| :-------------------------- | :---------------------------------------------------- |
-| `npm run dev`               | Start local Vite development server                   |
-| `npm run check:fast`        | Fast inner-loop check (`typecheck` + `lint` + `test`) |
-| `npm run check`             | Run the full unified verification gate                |
-| `npm run test`              | Run Vitest unit and integration tests                 |
-| `npm run test:e2e`          | Run Playwright E2E smoke tests                        |
-| `npm run lint`              | Run ESLint strict checks                              |
-| `npm run lint:tailwind`     | Check Tailwind classes for canonical formatting       |
-| `npm run lint:tailwind:fix` | Auto-fix Tailwind non-canonical classes               |
-| `npm run lint:workflows`    | Check GitHub Actions workflows with actionlint        |
-| `npm run format`            | Format files with Prettier                            |
-| `npm run format:check`      | Check file formatting with Prettier                   |
-| `npm run check:deadcode`    | Check for unused code and dependencies with Knip      |
-| `npm run build`             | Build production bundle                               |
+| Command      | Description                                                   |
+| :----------- | :------------------------------------------------------------ |
+| `vp dev`     | Start local Vite development server                           |
+| `vp check`   | Run unified checks (Oxfmt format, Oxlint lint, and TypeCheck) |
+| `vp lint`    | Run Oxlint strict linter checks                               |
+| `vp fmt`     | Run Oxfmt code formatting                                     |
+| `vp test`    | Run Vitest unit and browser integration tests                 |
+| `vp build`   | Build production bundle with Vite                             |
+| `vp preview` | Preview production build locally                              |
 
-### Agent & CI Ergonomics
+### Project Tasks & Agent Ergonomics (`vpr <script>`)
 
-| Script                       | Description                                                     |
-| :--------------------------- | :-------------------------------------------------------------- |
-| `npm run agent:typecheck`    | Strict TypeScript compiler check (`tsc -b --pretty false`)      |
-| `npm run agent:lint`         | Pure non-colored ESLint and Tailwind canonical checks           |
-| `npm run agent:test:unit`    | Flat TAP output Vitest execution without colors or spinners     |
-| `npm run agent:test:e2e`     | Headless Playwright tests in line-by-line reporter mode         |
-| `npm run agent:verify:inner` | Inner-loop fail-fast validation (`typecheck` + `lint`)          |
-| `npm run agent:verify:gate`  | Full automated gate (`verify:inner` + `test:unit` + `test:e2e`) |
+| Script                        | Description                                                                       |
+| :---------------------------- | :-------------------------------------------------------------------------------- |
+| `vpr agent:verify:inner`      | Inner-loop fail-fast validation (`vp check` + Tailwind canonical check)           |
+| `vpr agent:test:unit`         | Flat TAP output Vitest execution without colors or spinners                       |
+| `vpr agent:test:e2e`          | Headless Playwright tests in line-by-line reporter mode                           |
+| `vpr agent:verify:gate`       | Automated verification gate (`verify:inner` + `test:unit` + `build` + `test:e2e`) |
+| `vpr verify`                  | Complete verification gate (checks, deadcode analysis, tests, and build)          |
+| `vpr check:deadcode`          | Knip deadcode and unused dependency detection                                     |
+| `vpr agent:lint:tailwind`     | Check Tailwind classes for canonical formatting                                   |
+| `vpr agent:lint:tailwind:fix` | Auto-fix Tailwind non-canonical classes                                           |
+| `vpr agent:lint:fix`          | Run `vp check --fix` and Tailwind canonical auto-fix                              |
+| `vpr agent:lint:ci`           | Check GitHub Actions workflows with actionlint                                    |
+| `vpr test:setup`              | Install Playwright browser binaries                                               |
 
 ## Guidelines
 
