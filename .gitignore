@@ -28,4 +28,6 @@ dist-ssr
 .vitest
 test-results
 playwright-report
+blob-report
 .cache
+

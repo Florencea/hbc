@@ -7,6 +7,7 @@ import {
   serializeToHbcPgn,
   type MatchHistory,
 } from "../engine/replay.ts";
+import { cn } from "../lib/cn.ts";
 
 export interface ExportModalProps {
   isOpen: boolean;
@@ -22,12 +23,7 @@ export interface ImportModalProps {
   onShowToast: (msg: string, type: "info" | "success" | "error") => void;
 }
 
-export function ExportModal({
-  isOpen,
-  onClose,
-  history,
-  onShowToast,
-}: ExportModalProps) {
+export function ExportModal({ isOpen, onClose, history, onShowToast }: ExportModalProps) {
   const [tab, setTab] = useState<"PGN" | "JSON">("PGN");
 
   if (!isOpen) return null;
@@ -68,9 +64,7 @@ export function ExportModal({
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">📥</span>
-            <h2 className="text-base font-bold text-white">
-              匯出對局棋譜 (Export Match Notation)
-            </h2>
+            <h2 className="text-base font-bold text-white">匯出對局棋譜 (Export Match Notation)</h2>
           </div>
           <button
             type="button"
@@ -88,11 +82,12 @@ export function ExportModal({
             onClick={() => {
               setTab("PGN");
             }}
-            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={cn(
+              "cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
               tab === "PGN"
                 ? "bg-blue-600 text-white shadow-xs"
-                : "bg-slate-800 text-slate-400 hover:text-white"
-            }`}
+                : "bg-slate-800 text-slate-400 hover:text-white",
+            )}
           >
             HBC-PGN 棋譜格式
           </button>
@@ -101,11 +96,12 @@ export function ExportModal({
             onClick={() => {
               setTab("JSON");
             }}
-            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={cn(
+              "cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
               tab === "JSON"
                 ? "bg-blue-600 text-white shadow-xs"
-                : "bg-slate-800 text-slate-400 hover:text-white"
-            }`}
+                : "bg-slate-800 text-slate-400 hover:text-white",
+            )}
           >
             JSON 完整狀態檔
           </button>
@@ -146,12 +142,7 @@ export function ExportModal({
   );
 }
 
-export function ImportModal({
-  isOpen,
-  onClose,
-  onImportSuccess,
-  onShowToast,
-}: ImportModalProps) {
+export function ImportModal({ isOpen, onClose, onImportSuccess, onShowToast }: ImportModalProps) {
   const [inputText, setInputText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -162,16 +153,16 @@ export function ImportModal({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result;
+    reader.addEventListener("load", () => {
+      const content = reader.result;
       if (typeof content === "string") {
         setInputText(content);
         setErrorMessage(null);
       }
-    };
-    reader.onerror = () => {
+    });
+    reader.addEventListener("error", () => {
       setErrorMessage("讀取檔案失敗");
-    };
+    });
     reader.readAsText(file);
   };
 
@@ -200,17 +191,10 @@ export function ImportModal({
         return;
       }
 
-      const { history } = replayMatchActions(
-        parsed.mapPreset,
-        parsed.boardSize,
-        parsed.actions,
-      );
+      const { history } = replayMatchActions(parsed.mapPreset, parsed.boardSize, parsed.actions);
 
       onImportSuccess(history);
-      onShowToast(
-        `已成功重建並載入 PGN 棋譜 (${history.steps.length.toString()} 手)！`,
-        "success",
-      );
+      onShowToast(`已成功重建並載入 PGN 棋譜 (${history.steps.length.toString()} 手)！`, "success");
       onClose();
     } catch (err) {
       if (err instanceof Error) {
@@ -228,9 +212,7 @@ export function ImportModal({
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">📤</span>
-            <h2 className="text-base font-bold text-white">
-              載入外部棋譜 (Import Match Record)
-            </h2>
+            <h2 className="text-base font-bold text-white">載入外部棋譜 (Import Match Record)</h2>
           </div>
           <button
             type="button"

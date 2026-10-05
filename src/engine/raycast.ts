@@ -21,9 +21,7 @@ export const DIRECTIONS: readonly Coord[] = [
 ];
 
 export function isValidCoord(boardSize: number, coord: Coord): boolean {
-  return (
-    coord.x >= 0 && coord.x < boardSize && coord.y >= 0 && coord.y < boardSize
-  );
+  return coord.x >= 0 && coord.x < boardSize && coord.y >= 0 && coord.y < boardSize;
 }
 
 export function traceRay(
@@ -102,14 +100,7 @@ export function collectAllRaycasts(
   attackerSkillType: SkillType,
 ): RaycastResult[] {
   return DIRECTIONS.map((direction) =>
-    traceRay(
-      board,
-      boardSize,
-      startCoord,
-      direction,
-      attackerTeamId,
-      attackerSkillType,
-    ),
+    traceRay(board, boardSize, startCoord, direction, attackerTeamId, attackerSkillType),
   );
 }
 
@@ -128,11 +119,7 @@ export function getLegalMoves(
     for (let x = 0; x < state.size; x++) {
       if (state.board[y]?.[x] !== null) continue;
 
-      if (
-        state.isDropPhase &&
-        player.dropZone &&
-        !isWithinDropZone({ x, y }, player.dropZone)
-      ) {
+      if (state.isDropPhase && player.dropZone && !isWithinDropZone({ x, y }, player.dropZone)) {
         continue;
       }
 
@@ -157,10 +144,7 @@ export function getLegalMoves(
   return legalMoves;
 }
 
-export function getPioneerMoves(
-  state: GameState | MaskedGameState,
-  playerId: number,
-): Coord[] {
+export function getPioneerMoves(state: GameState | MaskedGameState, playerId: number): Coord[] {
   if (state.isGameOver) return [];
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return [];
@@ -183,17 +167,11 @@ export function getPioneerMoves(
     for (let x = 0; x < state.size; x++) {
       if (state.board[y]?.[x] !== null) continue;
 
-      if (
-        state.isDropPhase &&
-        player.dropZone &&
-        !isWithinDropZone({ x, y }, player.dropZone)
-      ) {
+      if (state.isDropPhase && player.dropZone && !isWithinDropZone({ x, y }, player.dropZone)) {
         continue;
       }
 
-      const isNearFriendly = friendlyCoords.some(
-        (c) => getDistance({ x, y }, c) <= 2,
-      );
+      const isNearFriendly = friendlyCoords.some((c) => getDistance({ x, y }, c) <= 2);
 
       if (isNearFriendly) {
         pioneerMoves.push({ x, y });

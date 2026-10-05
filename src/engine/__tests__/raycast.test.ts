@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { traceRay, getLegalMoves, isValidCoord } from "../raycast.ts";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 
 describe("raycast", () => {
   it("validates coordinate boundaries correctly", () => {
@@ -22,14 +17,7 @@ describe("raycast", () => {
     setCell(board, 2, 4, makePiece(2, 2));
     setCell(board, 2, 5, makePiece(1, 1));
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "NONE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "NONE");
     expect(result.capturedCoords).toEqual([
       { x: 3, y: 2 },
       { x: 4, y: 2 },
@@ -44,14 +32,7 @@ describe("raycast", () => {
     // (4, 2) is empty, (5, 2) is friendly
     setCell(board, 2, 5, makePiece(1, 1));
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "NONE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "NONE");
     expect(result.capturedCoords).toEqual([]);
     expect(result.isBlockedByWall).toBe(false);
   });
@@ -60,14 +41,7 @@ describe("raycast", () => {
     const board = createEmptyBoard(16);
     setCell(board, 2, 3, makePiece(1, 1));
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "NONE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "NONE");
     expect(result.capturedCoords).toEqual([]);
     expect(result.isBlockedByWall).toBe(false);
   });
@@ -78,14 +52,7 @@ describe("raycast", () => {
     setCell(board, 2, 4, makePiece(3, 3)); // Team 3
     setCell(board, 2, 5, makePiece(1, 4)); // Team 1 ally
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "NONE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "NONE");
     expect(result.capturedCoords).toEqual([
       { x: 3, y: 2 },
       { x: 4, y: 2 },
@@ -98,14 +65,7 @@ describe("raycast", () => {
     setCell(board, 2, 4, makePiece(2, 2, "WALL", false)); // Unrevealed WALL
     setCell(board, 2, 5, makePiece(1, 1));
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "NONE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "NONE");
     expect(result.capturedCoords).toEqual([]);
     expect(result.isBlockedByWall).toBe(true);
     expect(result.blockedCoord).toEqual({ x: 4, y: 2 });
@@ -118,14 +78,7 @@ describe("raycast", () => {
     setCell(board, 2, 4, makePiece(2, 2, "WALL", false));
     setCell(board, 2, 5, makePiece(1, 1));
 
-    const result = traceRay(
-      board,
-      16,
-      { x: 2, y: 2 },
-      { x: 1, y: 0 },
-      1,
-      "PIERCE",
-    );
+    const result = traceRay(board, 16, { x: 2, y: 2 }, { x: 1, y: 0 }, 1, "PIERCE");
     expect(result.capturedCoords).toEqual([
       { x: 3, y: 2 },
       { x: 4, y: 2 },

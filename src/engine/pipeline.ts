@@ -1,9 +1,4 @@
-import {
-  generateMap,
-  IllegalMoveError,
-  isWithinDropZone,
-  setPiece,
-} from "./map.ts";
+import { generateMap, IllegalMoveError, isWithinDropZone, setPiece } from "./map.ts";
 import {
   collectAllRaycasts,
   DIRECTIONS,
@@ -14,6 +9,7 @@ import {
 import { sanitizeForViewer } from "./sanitize.ts";
 import {
   SKILL_SPECS,
+  SPECIAL_SKILL_TYPES,
   type Action,
   type Board,
   type Coord,
@@ -70,8 +66,7 @@ export function createInitialState(
 ): GameState {
   let size = 16;
   let preset: MapPreset = "CROSSROADS";
-  let rawPlayers:
-    (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[] | undefined =
+  let rawPlayers: (Partial<Player> & Pick<Player, "id" | "teamId" | "name">)[] | undefined =
     players;
 
   if (typeof optionsOrSize === "number") {
@@ -115,10 +110,7 @@ export function createInitialState(
         isForcedSpecial: p.isForcedSpecial ?? false,
         dropZone: p.dropZone ? { ...p.dropZone } : undefined,
       }))
-    : [
-        createDefaultPlayer(1, 1, "Player 1"),
-        createDefaultPlayer(2, 2, "Player 2"),
-      ];
+    : [createDefaultPlayer(1, 1, "Player 1"), createDefaultPlayer(2, 2, "Player 2")];
 
   const { board, dropZones } = generateMap(preset, size, initializedPlayers);
 
@@ -152,9 +144,7 @@ export function createInitialGame(
       type: "DROP_PHASE_STARTED",
       mapPreset: state.mapPreset,
       players: state.players
-        .filter(
-          (p): p is Player & { dropZone: DropZone } => p.dropZone !== undefined,
-        )
+        .filter((p): p is Player & { dropZone: DropZone } => p.dropZone !== undefined)
         .map((p) => ({ playerId: p.id, dropZone: p.dropZone })),
     },
   ];
@@ -180,8 +170,7 @@ function clonePlayers(players: Player[]): Player[] {
 }
 
 function applyTurnEndUpkeep(player: Player, events: GameEvent[]): void {
-  const skillKeys = Object.keys(SKILL_SPECS) as (keyof typeof SKILL_SPECS)[];
-  for (const skill of skillKeys) {
+  for (const skill of SPECIAL_SKILL_TYPES) {
     if (player.hand[skill] >= SKILL_SPECS[skill].maxHand) {
       player.charge[skill] = 0;
       continue;
@@ -200,7 +189,7 @@ function applyTurnEndUpkeep(player: Player, events: GameEvent[]): void {
     }
   }
 
-  const isHandSaturated = skillKeys.every(
+  const isHandSaturated = SPECIAL_SKILL_TYPES.every(
     (skill) => player.hand[skill] >= SKILL_SPECS[skill].maxHand,
   );
   if (isHandSaturated && !player.isForcedSpecial) {
@@ -242,8 +231,7 @@ export function dispatch(
 
     // Advance turn
     const activeIdx = newPlayers.findIndex((p) => p.id === action.playerId);
-    const nextPlayer =
-      newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
+    const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
 
     // Advance drop phase if active
     let isDropPhase = state.isDropPhase;
@@ -266,9 +254,7 @@ export function dispatch(
       turn: state.currentTurn + 1,
     });
 
-    const consecutivePasses = state.isDropPhase
-      ? 0
-      : (state.consecutivePasses ?? 0) + 1;
+    const consecutivePasses = state.isDropPhase ? 0 : (state.consecutivePasses ?? 0) + 1;
     const isGameOver = checkGameOver(
       newBoard,
       state.size,
@@ -312,9 +298,7 @@ export function dispatch(
     attacker.dropZone &&
     !isWithinDropZone(action.coord, attacker.dropZone)
   ) {
-    throw new IllegalMoveError(
-      "Placement outside assigned drop zone during Drop Phase",
-    );
+    throw new IllegalMoveError("Placement outside assigned drop zone during Drop Phase");
   }
 
   if (!isValidCoord(state.size, action.coord)) {
@@ -361,25 +345,15 @@ export function dispatch(
   if (capturedCoords.length === 0) {
     // Check if this move was an optimistic standard move blocked by hidden WALL(s)
     const optimisticState = sanitizeForViewer(state, action.playerId);
-    const optimisticMoves = getLegalMoves(
-      optimisticState,
-      action.playerId,
-      attackerSkill,
-    );
+    const optimisticMoves = getLegalMoves(optimisticState, action.playerId, attackerSkill);
     const isOptimisticStandardMove = optimisticMoves.some(
       (c) => c.x === action.coord.x && c.y === action.coord.y,
     );
 
     if (!isOptimisticStandardMove) {
-      const standardMoves = getLegalMoves(
-        state,
-        action.playerId,
-        attackerSkill,
-      );
+      const standardMoves = getLegalMoves(state, action.playerId, attackerSkill);
       if (standardMoves.length > 0) {
-        throw new IllegalMoveError(
-          "Illegal move: must capture at least one piece",
-        );
+        throw new IllegalMoveError("Illegal move: must capture at least one piece");
       }
 
       const pioneerMoves = getPioneerMoves(state, action.playerId);
@@ -431,14 +405,7 @@ export function dispatch(
         });
       }
 
-      return finalizePlacementTurn(
-        state,
-        newBoard,
-        newPlayers,
-        attacker,
-        action.playerId,
-        events,
-      );
+      return finalizePlacementTurn(state, newBoard, newPlayers, attacker, action.playerId, events);
     }
   }
 
@@ -534,11 +501,7 @@ export function dispatch(
       // Backlash reverses the batch. If the backlash path encounters a WALL, it stops at the wall.
       let wallBlockedBacklash = false;
       for (const ray of raycasts) {
-        if (
-          ray.capturedCoords.some(
-            (c) => c.x === counterCoord.x && c.y === counterCoord.y,
-          )
-        ) {
+        if (ray.capturedCoords.some((c) => c.x === counterCoord.x && c.y === counterCoord.y)) {
           const dx = ray.direction.x;
           const dy = ray.direction.y;
           let cx = counterCoord.x - dx;
@@ -559,11 +522,7 @@ export function dispatch(
       const rawReversed: Coord[] = [action.coord, ...capturedCoords];
       const reversedCoords: Coord[] = [];
       for (const c of rawReversed) {
-        if (
-          wallBlockedBacklash &&
-          c.x === action.coord.x &&
-          c.y === action.coord.y
-        ) {
+        if (wallBlockedBacklash && c.x === action.coord.x && c.y === action.coord.y) {
           continue;
         }
         const p = newBoard[c.y]?.[c.x];
@@ -652,9 +611,7 @@ export function dispatch(
     }
 
     const fromTeamIds: number[] = [
-      ...new Set(
-        capturedCoords.map((c) => state.board[c.y]?.[c.x]?.teamId ?? 0),
-      ),
+      ...new Set(capturedCoords.map((c) => state.board[c.y]?.[c.x]?.teamId ?? 0)),
     ];
 
     for (const c of capturedCoords) {
@@ -780,14 +737,7 @@ export function dispatch(
     });
   }
 
-  return finalizePlacementTurn(
-    state,
-    newBoard,
-    newPlayers,
-    attacker,
-    action.playerId,
-    events,
-  );
+  return finalizePlacementTurn(state, newBoard, newPlayers, attacker, action.playerId, events);
 }
 
 function finalizePlacementTurn(
@@ -820,8 +770,7 @@ function finalizePlacementTurn(
 
   // Advance turn and check game over
   const activeIdx = newPlayers.findIndex((p) => p.id === actionPlayerId);
-  const nextPlayer =
-    newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
+  const nextPlayer = newPlayers[(activeIdx + 1) % newPlayers.length] ?? attacker;
 
   events.push({
     type: "TURN_CHANGED",
@@ -925,10 +874,7 @@ function applyPurifyPulses(
           if (target.skillType === "BOMB" || target.skillType === "COUNTER") {
             target.skillType = "NONE";
             target.isRevealed = true;
-          } else if (
-            target.skillType === "WALL" ||
-            target.skillType === "PURIFY"
-          ) {
+          } else if (target.skillType === "WALL" || target.skillType === "PURIFY") {
             target.isRevealed = true;
           }
           affectedCoords.push({ x: nx, y: ny });
@@ -1012,9 +958,6 @@ function calculateWinnerTeam(board: Board, size: number): number | null {
   return isTie ? null : winner;
 }
 
-export function resolveAction(
-  state: GameState,
-  action: Action,
-): ResolutionResult {
+export function resolveAction(state: GameState, action: Action): ResolutionResult {
   return dispatch(state, action);
 }

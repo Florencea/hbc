@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
-import {
-  SKILL_SPECS,
-  type Board,
-  type GameState,
-  type Player,
-} from "../types.ts";
+import { SKILL_SPECS, type Board, type GameEvent, type GameState, type Player } from "../types.ts";
 import { createEmptyBoard, makePiece, setCell } from "./helpers.ts";
 
 function createEconomyPlayer(
@@ -41,11 +36,7 @@ function createEconomyPlayer(
   };
 }
 
-function makeEconomyTestState(
-  board: Board,
-  players: Player[],
-  activePlayerId = 1,
-): GameState {
+function makeEconomyTestState(board: Board, players: Player[], activePlayerId = 1): GameState {
   return {
     board,
     size: 16,
@@ -173,14 +164,13 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     expect(player1After?.charge.PIERCE).toBe(0);
 
     const acquiredEvent = events.find(
-      (e) => e.type === "SKILL_ACQUIRED" && e.skillType === "PIERCE",
+      (e): e is Extract<GameEvent, { type: "SKILL_ACQUIRED" }> =>
+        e.type === "SKILL_ACQUIRED" && e.skillType === "PIERCE",
     );
     expect(acquiredEvent).toBeDefined();
-    if (acquiredEvent?.type === "SKILL_ACQUIRED") {
-      expect(acquiredEvent.playerId).toBe(1);
-      expect(acquiredEvent.skillType).toBe("PIERCE");
-      expect(acquiredEvent.currentHandCount).toBe(1);
-    }
+    expect(acquiredEvent?.playerId).toBe(1);
+    expect(acquiredEvent?.skillType).toBe("PIERCE");
+    expect(acquiredEvent?.currentHandCount).toBe(1);
   });
 
   it("forced_discharge_triggers_on_cap_overflow: Reaching cap and completing CD enforces isForcedSpecial: true", () => {
@@ -226,12 +216,11 @@ describe("Economy Engine Suite (economy.test.ts)", () => {
     expect(player1After?.isForcedSpecial).toBe(true);
 
     const forcedEvent = events.find(
-      (e) => e.type === "FORCED_SPECIAL_TRIGGERED",
+      (e): e is Extract<GameEvent, { type: "FORCED_SPECIAL_TRIGGERED" }> =>
+        e.type === "FORCED_SPECIAL_TRIGGERED",
     );
     expect(forcedEvent).toBeDefined();
-    if (forcedEvent?.type === "FORCED_SPECIAL_TRIGGERED") {
-      expect(forcedEvent.playerId).toBe(1);
-    }
+    expect(forcedEvent?.playerId).toBe(1);
   });
 
   it("forced_discharge_rejects_none_placement: When isForcedSpecial: true, playing NONE throws an error", () => {

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import type { GameEvent } from "../types.ts";
 import {
   createInitialGame,
   createInitialState,
@@ -44,18 +40,18 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(res1.nextState.board[2]?.[4]?.teamId).toBe(1);
     expect(res1.nextState.board[2]?.[4]?.playerId).toBe(1);
 
-    const flipEvent1 = res1.events.find((e) => e.type === "FLIP_BATCH");
+    const flipEvent1 = res1.events.find(
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+    );
     expect(flipEvent1).toBeDefined();
-    if (flipEvent1?.type === "FLIP_BATCH") {
-      expect(flipEvent1.toTeamId).toBe(1);
-      expect(flipEvent1.fromTeamIds).toContain(0);
-      expect(flipEvent1.coords).toEqual(
-        expect.arrayContaining([
-          { x: 3, y: 2 },
-          { x: 4, y: 2 },
-        ]),
-      );
-    }
+    expect(flipEvent1?.toTeamId).toBe(1);
+    expect(flipEvent1?.fromTeamIds).toContain(0);
+    expect(flipEvent1?.coords).toEqual(
+      expect.arrayContaining([
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+      ]),
+    );
 
     // Now active player is Player 2. Player 2 plays at (8, 10), sandwiching (8, 9) against (8, 8)
     const res2 = dispatch(res1.nextState, {
@@ -93,11 +89,9 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     // (1, 3) would capture (1, 2) against (1, 1), but is far outside dropZone (center 7, 7 radius 2)
     const p1DropZone = player1?.dropZone;
     expect(p1DropZone).toBeDefined();
-    if (p1DropZone) {
-      expect(getDistance({ x: 3, y: 1 }, p1DropZone.center)).toBeGreaterThan(
-        p1DropZone.radius,
-      );
-    }
+    expect(getDistance({ x: 3, y: 1 }, p1DropZone?.center ?? { x: 0, y: 0 })).toBeGreaterThan(
+      p1DropZone?.radius ?? 0,
+    );
 
     expect(() =>
       dispatch(state, {
@@ -150,11 +144,11 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(nextState.dropTurnsRemaining).toBe(3);
     expect(nextState.isDropPhase).toBe(true);
 
-    const flip = events.find((e) => e.type === "FLIP_BATCH");
+    const flip = events.find(
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+    );
     expect(flip).toBeDefined();
-    if (flip?.type === "FLIP_BATCH") {
-      expect(flip.coords).toContainEqual({ x: 7, y: 6 });
-    }
+    expect(flip?.coords).toContainEqual({ x: 7, y: 6 });
   });
 
   it("drop_phase_ends_after_turns_exhausted: isDropPhase switches to false and allows full-board placement", () => {
@@ -266,11 +260,11 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
       coord: archMove,
       skillType: "NONE",
     });
-    const archFlip = archRes.events.find((e) => e.type === "FLIP_BATCH");
+    const archFlip = archRes.events.find(
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+    );
     expect(archFlip).toBeDefined();
-    if (archFlip?.type === "FLIP_BATCH") {
-      expect(archFlip.fromTeamIds).toContain(0);
-    }
+    expect(archFlip?.fromTeamIds).toContain(0);
 
     // 2. TRENCHES preset
     const trenchState = createInitialState({
@@ -303,10 +297,7 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     }
 
     // Verify Player 1 has legal moves along the trench
-    const trenchLegalMoves = getLegalMoves(
-      trenchState,
-      trenchState.activePlayerId,
-    );
+    const trenchLegalMoves = getLegalMoves(trenchState, trenchState.activePlayerId);
     expect(trenchLegalMoves.length).toBeGreaterThan(0);
     const trenchMove = trenchLegalMoves[0];
     if (!trenchMove) {
@@ -319,11 +310,11 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
       coord: trenchMove,
       skillType: "NONE",
     });
-    const trenchFlip = trenchRes.events.find((e) => e.type === "FLIP_BATCH");
+    const trenchFlip = trenchRes.events.find(
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+    );
     expect(trenchFlip).toBeDefined();
-    if (trenchFlip?.type === "FLIP_BATCH") {
-      expect(trenchFlip.fromTeamIds).toContain(0);
-    }
+    expect(trenchFlip?.fromTeamIds).toContain(0);
   });
 
   it("createInitialGame: initializes game with DROP_PHASE_STARTED event and player drop zones", () => {
@@ -334,12 +325,13 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(state.mapPreset).toBe("CROSSROADS");
     expect(state.isDropPhase).toBe(true);
 
-    const startEvent = events.find((e) => e.type === "DROP_PHASE_STARTED");
+    const startEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "DROP_PHASE_STARTED" }> =>
+        e.type === "DROP_PHASE_STARTED",
+    );
     expect(startEvent).toBeDefined();
-    if (startEvent?.type === "DROP_PHASE_STARTED") {
-      expect(startEvent.mapPreset).toBe("CROSSROADS");
-      expect(startEvent.players).toHaveLength(2);
-      expect(startEvent.players[0]?.dropZone.radius).toBe(3);
-    }
+    expect(startEvent?.mapPreset).toBe("CROSSROADS");
+    expect(startEvent?.players).toHaveLength(2);
+    expect(startEvent?.players[0]?.dropZone.radius).toBe(3);
   });
 });

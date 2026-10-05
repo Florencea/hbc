@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { GameEvent } from "../types.ts";
 import { dispatch } from "../pipeline.ts";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 
 describe("Game Over Mechanics", () => {
   it("consecutive passes trigger game over when both players pass outside drop phase", () => {
@@ -35,11 +31,11 @@ describe("Game Over Mechanics", () => {
     expect(res2.nextState.isGameOver).toBe(true);
     expect(res2.nextState.winnerTeamId).toBe(1); // Team 1 has 2 pieces, Team 2 has 1 piece
 
-    const gameOverEvent = res2.events.find((e) => e.type === "GAME_OVER");
+    const gameOverEvent = res2.events.find(
+      (e): e is Extract<GameEvent, { type: "GAME_OVER" }> => e.type === "GAME_OVER",
+    );
     expect(gameOverEvent).toBeDefined();
-    if (gameOverEvent?.type === "GAME_OVER") {
-      expect(gameOverEvent.winnerTeamId).toBe(1);
-    }
+    expect(gameOverEvent?.winnerTeamId).toBe(1);
   });
 
   it("piece placement resets consecutive passes", () => {

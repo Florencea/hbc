@@ -1,5 +1,6 @@
 import type { Coord } from "../engine/types.ts";
 import type { CombatTextVariant } from "../fx/choreography.ts";
+import { cn } from "../lib/cn.ts";
 
 export interface CombatTextItem {
   id: string;
@@ -25,13 +26,12 @@ function getVariantBadgeClass(variant: CombatTextVariant): string {
       return "border-amber-300/95 bg-amber-950/95 text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.75)] ring-1 ring-amber-300/60";
     case "pierce":
       return "border-cyan-300/95 bg-cyan-950/95 text-cyan-200 shadow-[0_0_18px_rgba(56,189,248,0.75)] ring-1 ring-cyan-300/60";
+    default:
+      return "";
   }
 }
 
-export function FloatingCombatText({
-  items,
-  boardSize,
-}: FloatingCombatTextProps) {
+export function FloatingCombatText({ items, boardSize }: FloatingCombatTextProps) {
   if (items.length === 0) return null;
 
   return (
@@ -50,9 +50,10 @@ export function FloatingCombatText({
             }}
           >
             <span
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase shadow-lg backdrop-blur-xs sm:text-xs ${getVariantBadgeClass(
-                item.variant,
-              )}`}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase shadow-lg backdrop-blur-xs sm:text-xs",
+                getVariantBadgeClass(item.variant),
+              )}
             >
               {item.variant === "bomb" && <span>💥</span>}
               {item.variant === "counter" && <span>🌌</span>}

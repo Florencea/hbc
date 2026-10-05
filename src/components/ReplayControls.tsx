@@ -1,6 +1,7 @@
 import type { MatchStepRecord, ReplaySession } from "../engine/replay.ts";
 import { coordToAlgebraic } from "../engine/replay.ts";
 import type { SkillType } from "../engine/types.ts";
+import { cn } from "../lib/cn.ts";
 
 export interface ReplayControlsProps {
   session: ReplaySession;
@@ -45,19 +46,13 @@ function formatEventSummary(step: MatchStepRecord): string[] {
         }
         break;
       case "BOMB_TRIGGERED":
-        summaries.push(
-          `殺戮盛宴 引爆！（波及 ${ev.blastCoords.length.toString()} 顆）`,
-        );
+        summaries.push(`殺戮盛宴 引爆！（波及 ${ev.blastCoords.length.toString()} 顆）`);
         break;
       case "COUNTER_TRIGGERED":
-        summaries.push(
-          `深淵復仇者 反擊！（逆轉 ${ev.reversedCoords.length.toString()} 顆）`,
-        );
+        summaries.push(`深淵復仇者 反擊！（逆轉 ${ev.reversedCoords.length.toString()} 顆）`);
         break;
       case "PURIFY_PULSE":
-        summaries.push(
-          `救贖之光 淨化！（感化 ${ev.affectedCoords.length.toString()} 顆）`,
-        );
+        summaries.push(`救贖之光 淨化！（感化 ${ev.affectedCoords.length.toString()} 顆）`);
         break;
       case "GAME_OVER":
         summaries.push("對局分出勝負（遊戲結束）");
@@ -128,11 +123,12 @@ export function ReplayControls({
               onClick={() => {
                 onViewerChange(null);
               }}
-              className={`cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+              className={cn(
+                "cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all",
                 viewerId === null
                   ? "bg-purple-600 text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
-              }`}
+                  : "text-slate-400 hover:text-white",
+              )}
             >
               上帝視角
             </button>
@@ -141,11 +137,12 @@ export function ReplayControls({
               onClick={() => {
                 onViewerChange(1);
               }}
-              className={`cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+              className={cn(
+                "cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all",
                 viewerId === 1
                   ? "bg-zinc-700 text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
-              }`}
+                  : "text-slate-400 hover:text-white",
+              )}
             >
               黑方視角
             </button>
@@ -154,11 +151,12 @@ export function ReplayControls({
               onClick={() => {
                 onViewerChange(2);
               }}
-              className={`cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all ${
+              className={cn(
+                "cursor-pointer rounded px-2 py-0.5 text-xs font-semibold transition-all",
                 viewerId === 2
                   ? "bg-slate-300 text-slate-950 shadow-xs"
-                  : "text-slate-400 hover:text-white"
-              }`}
+                  : "text-slate-400 hover:text-white",
+              )}
             >
               白方視角
             </button>
@@ -189,9 +187,7 @@ export function ReplayControls({
         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
           <span>開局初始 (0)</span>
           <span className="font-mono text-indigo-300">
-            {replayIndex === -1
-              ? "初始盤面"
-              : `落子第 ${(replayIndex + 1).toString()} 手`}
+            {replayIndex === -1 ? "初始盤面" : `落子第 ${(replayIndex + 1).toString()} 手`}
           </span>
           <span>終局 (第 {totalSteps.toString()} 手)</span>
         </div>
@@ -241,11 +237,12 @@ export function ReplayControls({
             type="button"
             onClick={onTogglePlay}
             disabled={totalSteps === 0}
-            className={`cursor-pointer rounded-lg px-4 py-1.5 text-xs font-black transition-all ${
+            className={cn(
+              "cursor-pointer rounded-lg px-4 py-1.5 text-xs font-black transition-all",
               isPlaying
                 ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
-                : "bg-indigo-600 text-white hover:bg-indigo-500"
-            }`}
+                : "bg-indigo-600 text-white hover:bg-indigo-500",
+            )}
           >
             {isPlaying ? "⏸ 暫停" : "▶ 自動播放"}
           </button>
@@ -289,9 +286,7 @@ export function ReplayControls({
         {/* Current Move Notation Badge */}
         {currentStep && (
           <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
-            <span className="font-mono font-semibold text-slate-400">
-              {currentStep.notation}
-            </span>
+            <span className="font-mono font-semibold text-slate-400">{currentStep.notation}</span>
           </div>
         )}
       </div>
@@ -301,11 +296,12 @@ export function ReplayControls({
         <div className="flex flex-col gap-1.5 rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+              className={cn(
+                "rounded-md px-2 py-0.5 text-[11px] font-bold",
                 currentStep.playerId === 1
                   ? "bg-zinc-800 text-white ring-1 ring-zinc-500"
-                  : "bg-slate-200 text-slate-900 ring-1 ring-slate-400"
-              }`}
+                  : "bg-slate-200 text-slate-900 ring-1 ring-slate-400",
+              )}
             >
               {currentStep.playerId === 1 ? "第一隊（黑方）" : "第二隊（白方）"}
             </span>
@@ -315,12 +311,14 @@ export function ReplayControls({
                 <span className="text-slate-300">落子於</span>
                 <span className="font-mono font-black text-amber-300">
                   {coordToAlgebraic(currentStep.action.coord)} (
-                  {currentStep.action.coord.x.toString()},{" "}
-                  {currentStep.action.coord.y.toString()})
+                  {currentStep.action.coord.x.toString()}, {currentStep.action.coord.y.toString()})
                 </span>
                 <span className="text-slate-300">部署棋子：</span>
                 <span
-                  className={`font-bold ${SKILL_NAMES[currentStep.action.skillType ?? "NONE"].color}`}
+                  className={cn(
+                    "font-bold",
+                    SKILL_NAMES[currentStep.action.skillType ?? "NONE"].color,
+                  )}
                 >
                   {SKILL_NAMES[currentStep.action.skillType ?? "NONE"].name}
                 </span>

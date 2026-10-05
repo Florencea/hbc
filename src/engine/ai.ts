@@ -1,10 +1,6 @@
 import { isWithinDropZone } from "./map.ts";
 import { dispatch } from "./pipeline.ts";
-import {
-  collectAllRaycasts,
-  getAvailableMoves,
-  getLegalMoves,
-} from "./raycast.ts";
+import { collectAllRaycasts, getAvailableMoves, getLegalMoves } from "./raycast.ts";
 import { sanitizeForViewer } from "./sanitize.ts";
 import {
   SKILL_SPECS,
@@ -26,13 +22,14 @@ const ALL_SPECIAL_SKILLS: readonly Exclude<SkillType, "NONE">[] = [
   "COUNTER",
 ];
 
+function getActionCoord(action: Action): Coord | null {
+  return "coord" in action ? action.coord : null;
+}
+
 /**
  * Checks if a coordinate is a C-square or X-square adjacent to a board corner.
  */
-function isCXSquare(
-  coord: Coord,
-  size: number,
-): { isCX: boolean; corner: Coord } | null {
+function isCXSquare(coord: Coord, size: number): { isCX: boolean; corner: Coord } | null {
   const { x, y } = coord;
   const last = size - 1;
 
@@ -41,19 +38,11 @@ function isCXSquare(
     return { isCX: true, corner: { x: 0, y: 0 } };
   }
   // Top-Right (last, 0)
-  if (
-    (x === last - 1 && y === 0) ||
-    (x === last && y === 1) ||
-    (x === last - 1 && y === 1)
-  ) {
+  if ((x === last - 1 && y === 0) || (x === last && y === 1) || (x === last - 1 && y === 1)) {
     return { isCX: true, corner: { x: last, y: 0 } };
   }
   // Bottom-Left (0, last)
-  if (
-    (x === 0 && y === last - 1) ||
-    (x === 1 && y === last) ||
-    (x === 1 && y === last - 1)
-  ) {
+  if ((x === 0 && y === last - 1) || (x === 1 && y === last) || (x === 1 && y === last - 1)) {
     return { isCX: true, corner: { x: 0, y: last } };
   }
   // Bottom-Right (last, last)
@@ -75,11 +64,7 @@ function isCXSquare(
  * - C-squares and X-squares adjacent to empty corners: -30
  * - Interior squares: 0
  */
-export function getPositionalWeight(
-  coord: Coord,
-  board: Board,
-  size: number,
-): number {
+export function getPositionalWeight(coord: Coord, board: Board, size: number): number {
   const { x, y } = coord;
   const last = size - 1;
 
@@ -109,12 +94,7 @@ export function getPositionalWeight(
 }
 
 function isEdgeCoord(size: number, coord: Coord): boolean {
-  return (
-    coord.x === 0 ||
-    coord.x === size - 1 ||
-    coord.y === 0 ||
-    coord.y === size - 1
-  );
+  return coord.x === 0 || coord.x === size - 1 || coord.y === 0 || coord.y === size - 1;
 }
 
 function isChokePoint(board: Board, size: number, coord: Coord): boolean {
@@ -169,10 +149,7 @@ export function isOpponentCounterReady(
 ): boolean {
   for (const player of state.players) {
     if (player.teamId !== friendlyTeamId) {
-      if (
-        player.hand.COUNTER > 0 ||
-        player.charge.COUNTER >= SKILL_SPECS.COUNTER.cd
-      ) {
+      if (player.hand.COUNTER > 0 || player.charge.COUNTER >= SKILL_SPECS.COUNTER.cd) {
         return true;
       }
     }
@@ -197,13 +174,7 @@ export function calculateRiskScore(
   // If opponent COUNTER is ready and a raycast captures >2 pieces containing unrevealed enemy pieces,
   // apply a severe risk penalty unless the attacking piece is PIERCE (which is completely immune).
   if (isCounterReady && skill !== "PIERCE") {
-    const raycasts = collectAllRaycasts(
-      board,
-      size,
-      coord,
-      friendlyTeamId,
-      skill,
-    );
+    const raycasts = collectAllRaycasts(board, size, coord, friendlyTeamId, skill);
     for (const r of raycasts) {
       if (r.capturedCoords.length > 2) {
         const hasUnrevealedEnemy = r.capturedCoords.some((c) => {
@@ -263,9 +234,7 @@ export function isSuicidePioneerMove(
           "NONE",
         );
         for (const r of raycasts) {
-          if (
-            r.capturedCoords.some((c) => c.x === pCoord.x && c.y === pCoord.y)
-          ) {
+          if (r.capturedCoords.some((c) => c.x === pCoord.x && c.y === pCoord.y)) {
             return true;
           }
         }
@@ -346,9 +315,7 @@ export function evaluateBoardState(
   // 4. Mobility differential
   const aiMobility = getLegalMoves(state, aiPlayerId, "NONE").length;
   const oppPlayer = state.players.find((p) => p.teamId !== aiTeamId);
-  const oppMobility = oppPlayer
-    ? getLegalMoves(state, oppPlayer.id, "NONE").length
-    : 0;
+  const oppMobility = oppPlayer ? getLegalMoves(state, oppPlayer.id, "NONE").length : 0;
   score += (aiMobility - oppMobility) * 6;
 
   // 5. Special Skill Inventory
@@ -418,15 +385,7 @@ function minimaxSearch(
           type: "PASS_TURN",
           playerId: activePlayerId,
         });
-        return minimaxSearch(
-          nextState,
-          depth - 1,
-          alpha,
-          beta,
-          false,
-          aiPlayerId,
-          aiTeamId,
-        );
+        return minimaxSearch(nextState, depth - 1, alpha, beta, false, aiPlayerId, aiTeamId);
       } catch {
         return evaluateBoardState(state, aiPlayerId, aiTeamId);
       }
@@ -457,9 +416,7 @@ function minimaxSearch(
         continue;
       }
     }
-    return maxEval === -Infinity
-      ? evaluateBoardState(state, aiPlayerId, aiTeamId)
-      : maxEval;
+    return maxEval === -Infinity ? evaluateBoardState(state, aiPlayerId, aiTeamId) : maxEval;
   } else {
     // Minimizing node (Opponent's turn)
     let minEval = Infinity;
@@ -485,15 +442,7 @@ function minimaxSearch(
           type: "PASS_TURN",
           playerId: activePlayerId,
         });
-        return minimaxSearch(
-          nextState,
-          depth - 1,
-          alpha,
-          beta,
-          true,
-          aiPlayerId,
-          aiTeamId,
-        );
+        return minimaxSearch(nextState, depth - 1, alpha, beta, true, aiPlayerId, aiTeamId);
       } catch {
         return evaluateBoardState(state, aiPlayerId, aiTeamId);
       }
@@ -524,9 +473,7 @@ function minimaxSearch(
         continue;
       }
     }
-    return minEval === Infinity
-      ? evaluateBoardState(state, aiPlayerId, aiTeamId)
-      : minEval;
+    return minEval === Infinity ? evaluateBoardState(state, aiPlayerId, aiTeamId) : minEval;
   }
 }
 
@@ -534,11 +481,7 @@ function minimaxSearch(
  * 2-ply Minimax depth search with Alpha-Beta pruning and trap risk modeling.
  * Evaluates candidate moves under sanitized perspective within <350ms performance budget.
  */
-export function selectBestMoveMinimax(
-  state: GameState,
-  playerId: number,
-  depth = 2,
-): Action {
+export function selectBestMoveMinimax(state: GameState, playerId: number, depth = 2): Action {
   if (state.isGameOver) {
     return { type: "PASS_TURN", playerId };
   }
@@ -586,15 +529,8 @@ export function selectBestMoveMinimax(
         player.teamId,
         skill,
       );
-      const captureCount = raycasts.reduce(
-        (acc, r) => acc + r.capturedCoords.length,
-        0,
-      );
-      const posWeight = getPositionalWeight(
-        coord,
-        sanitized.board,
-        sanitized.size,
-      );
+      const captureCount = raycasts.reduce((acc, r) => acc + r.capturedCoords.length, 0);
+      const posWeight = getPositionalWeight(coord, sanitized.board, sanitized.size);
 
       let hScore = captureCount * 10 + posWeight * 1.5;
 
@@ -612,13 +548,10 @@ export function selectBestMoveMinimax(
         if (skill === "WALL") {
           if (posWeight >= 100) hScore += 50;
           else if (isEdgeCoord(sanitized.size, coord)) hScore += 35;
-          if (isChokePoint(sanitized.board, sanitized.size, coord))
-            hScore += 30;
+          if (isChokePoint(sanitized.board, sanitized.size, coord)) hScore += 30;
           if (captureCount >= 2) hScore += 15;
         } else if (skill === "PIERCE") {
-          const penetratesWall = raycasts.some(
-            (r) => r.penetratedWallCoords.length > 0,
-          );
+          const penetratesWall = raycasts.some((r) => r.penetratedWallCoords.length > 0);
           if (penetratesWall) hScore += 65;
           if (captureCount >= 4) hScore += 35;
           else if (captureCount >= 2) hScore += 20;
@@ -704,15 +637,7 @@ export function selectBestMoveMinimax(
                 : -10000;
         } else {
           const nextIsMax = nextState.activePlayerId === playerId;
-          score = minimaxSearch(
-            nextState,
-            depth - 1,
-            alpha,
-            beta,
-            nextIsMax,
-            playerId,
-            aiTeamId,
-          );
+          score = minimaxSearch(nextState, depth - 1, alpha, beta, nextIsMax, playerId, aiTeamId);
         }
 
         // Incorporate 1-ply risk penalty into final score
@@ -728,10 +653,13 @@ export function selectBestMoveMinimax(
       if (Math.abs(b.score - a.score) > 1e-6) {
         return b.score - a.score;
       }
-      const aCoord = (a.action as { coord: Coord }).coord;
-      const bCoord = (b.action as { coord: Coord }).coord;
-      if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
-      return aCoord.x - bCoord.x;
+      const aCoord = getActionCoord(a.action);
+      const bCoord = getActionCoord(b.action);
+      if (aCoord && bCoord) {
+        if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
+        return aCoord.x - bCoord.x;
+      }
+      return 0;
     });
 
     for (const decision of minimaxDecisions) {
@@ -745,11 +673,7 @@ export function selectBestMoveMinimax(
   }
 
   // 4. Pioneer Strategy: Evaluate pioneer moves if no standard moves succeed
-  const available = getAvailableMoves(
-    sanitized,
-    playerId,
-    candidateSkills[0] ?? "NONE",
-  );
+  const available = getAvailableMoves(sanitized, playerId, candidateSkills[0] ?? "NONE");
 
   if (available.pioneerMoves.length > 0) {
     const targets: Coord[] = [];
@@ -765,11 +689,7 @@ export function selectBestMoveMinimax(
     const pioneerDecisions: { action: Action; score: number }[] = [];
 
     for (const pCoord of available.pioneerMoves) {
-      if (
-        sanitized.isDropPhase &&
-        player.dropZone &&
-        !isWithinDropZone(pCoord, player.dropZone)
-      ) {
+      if (sanitized.isDropPhase && player.dropZone && !isWithinDropZone(pCoord, player.dropZone)) {
         continue;
       }
 
@@ -784,20 +704,11 @@ export function selectBestMoveMinimax(
         d = Math.hypot(pCoord.x - center, pCoord.y - center);
       }
 
-      const posWeight = getPositionalWeight(
-        pCoord,
-        sanitized.board,
-        sanitized.size,
-      );
+      const posWeight = getPositionalWeight(pCoord, sanitized.board, sanitized.size);
       const baseScore = -d * 50 + posWeight * 0.1;
 
       // Pioneer safety: check if placement creates an immediate sandwich line for opponent
-      const isSuicide = isSuicidePioneerMove(
-        sanitized,
-        playerId,
-        pCoord,
-        "NONE",
-      );
+      const isSuicide = isSuicidePioneerMove(sanitized, playerId, pCoord, "NONE");
 
       for (const skill of candidateSkills) {
         let skillScore = baseScore;
@@ -819,8 +730,7 @@ export function selectBestMoveMinimax(
           if (isSaturated) skillScore += 15;
           if (skill === "WALL") {
             if (isEdgeCoord(sanitized.size, pCoord)) skillScore += 30;
-            if (isChokePoint(sanitized.board, sanitized.size, pCoord))
-              skillScore += 25;
+            if (isChokePoint(sanitized.board, sanitized.size, pCoord)) skillScore += 25;
             skillScore += 10;
           } else if (skill === "BOMB") {
             if (clusterCount >= 1) skillScore += 35;
@@ -859,10 +769,13 @@ export function selectBestMoveMinimax(
       if (Math.abs(b.score - a.score) > 1e-6) {
         return b.score - a.score;
       }
-      const aCoord = (a.action as { coord: Coord }).coord;
-      const bCoord = (b.action as { coord: Coord }).coord;
-      if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
-      return aCoord.x - bCoord.x;
+      const aCoord = getActionCoord(a.action);
+      const bCoord = getActionCoord(b.action);
+      if (aCoord && bCoord) {
+        if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
+        return aCoord.x - bCoord.x;
+      }
+      return 0;
     });
 
     for (const decision of pioneerDecisions) {
@@ -940,15 +853,8 @@ export function selectBestMove(
         player.teamId,
         skill,
       );
-      const captureCount = raycasts.reduce(
-        (acc, r) => acc + r.capturedCoords.length,
-        0,
-      );
-      const posWeight = getPositionalWeight(
-        coord,
-        sanitized.board,
-        sanitized.size,
-      );
+      const captureCount = raycasts.reduce((acc, r) => acc + r.capturedCoords.length, 0);
+      const posWeight = getPositionalWeight(coord, sanitized.board, sanitized.size);
 
       let score = captureCount * 10;
 
@@ -993,9 +899,7 @@ export function selectBestMove(
             score += 15;
           }
         } else if (skill === "PIERCE") {
-          const penetratesWall = raycasts.some(
-            (r) => r.penetratedWallCoords.length > 0,
-          );
+          const penetratesWall = raycasts.some((r) => r.penetratedWallCoords.length > 0);
           if (penetratesWall) {
             // Shatters enemy defensive wall!
             score += 65;
@@ -1116,10 +1020,13 @@ export function selectBestMove(
     if (Math.abs(b.score - a.score) > 1e-6) {
       return b.score - a.score;
     }
-    const aCoord = (a.action as { coord: Coord }).coord;
-    const bCoord = (b.action as { coord: Coord }).coord;
-    if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
-    return aCoord.x - bCoord.x;
+    const aCoord = getActionCoord(a.action);
+    const bCoord = getActionCoord(b.action);
+    if (aCoord && bCoord) {
+      if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
+      return aCoord.x - bCoord.x;
+    }
+    return 0;
   });
 
   // Pick the highest scoring move that is legally executable on real state
@@ -1134,11 +1041,7 @@ export function selectBestMove(
   }
 
   // 3. Pioneer Strategy: Check pioneer moves when standard moves are empty
-  const available = getAvailableMoves(
-    sanitized,
-    playerId,
-    candidateSkills[0] ?? "NONE",
-  );
+  const available = getAvailableMoves(sanitized, playerId, candidateSkills[0] ?? "NONE");
 
   if (available.pioneerMoves.length > 0) {
     // Find all enemy pieces and neutral anchors on board
@@ -1155,11 +1058,7 @@ export function selectBestMove(
     const pioneerDecisions: { action: Action; score: number }[] = [];
 
     for (const pCoord of available.pioneerMoves) {
-      if (
-        sanitized.isDropPhase &&
-        player.dropZone &&
-        !isWithinDropZone(pCoord, player.dropZone)
-      ) {
+      if (sanitized.isDropPhase && player.dropZone && !isWithinDropZone(pCoord, player.dropZone)) {
         continue;
       }
 
@@ -1178,20 +1077,11 @@ export function selectBestMove(
       }
 
       // Tie-break with positional weight and coordinate order
-      const posWeight = getPositionalWeight(
-        pCoord,
-        sanitized.board,
-        sanitized.size,
-      );
+      const posWeight = getPositionalWeight(pCoord, sanitized.board, sanitized.size);
       const baseScore = -d * 50 + posWeight * 0.1;
 
       // Pioneer safety: check if placement creates an immediate sandwich line for opponent
-      const isSuicide = isSuicidePioneerMove(
-        sanitized,
-        playerId,
-        pCoord,
-        "NONE",
-      );
+      const isSuicide = isSuicidePioneerMove(sanitized, playerId, pCoord, "NONE");
 
       for (const skill of candidateSkills) {
         let skillScore = baseScore;
@@ -1259,10 +1149,13 @@ export function selectBestMove(
       if (Math.abs(b.score - a.score) > 1e-6) {
         return b.score - a.score;
       }
-      const aCoord = (a.action as { coord: Coord }).coord;
-      const bCoord = (b.action as { coord: Coord }).coord;
-      if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
-      return aCoord.x - bCoord.x;
+      const aCoord = getActionCoord(a.action);
+      const bCoord = getActionCoord(b.action);
+      if (aCoord && bCoord) {
+        if (aCoord.y !== bCoord.y) return aCoord.y - bCoord.y;
+        return aCoord.x - bCoord.x;
+      }
+      return 0;
     });
 
     for (const decision of pioneerDecisions) {

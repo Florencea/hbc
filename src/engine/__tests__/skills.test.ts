@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 import { dispatch, resolveAction } from "../pipeline.ts";
 import type { GameEvent } from "../types.ts";
 
@@ -43,9 +38,7 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     const blockedEvent = events.find((e) => e.type === "RAYCAST_BLOCKED");
     expect(blockedEvent).toBeDefined();
 
-    const revealedEvent = events.find(
-      (e) => e.type === "PIECE_REVEALED" && e.skillType === "WALL",
-    );
+    const revealedEvent = events.find((e) => e.type === "PIECE_REVEALED" && e.skillType === "WALL");
     expect(revealedEvent).toBeDefined();
   });
 
@@ -132,11 +125,11 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     expect(nextState.board[2]?.[4]?.skillType).toBe("NONE");
     expect(nextState.board[2]?.[4]?.isRevealed).toBe(true);
 
-    const counterEvent = events.find((e) => e.type === "COUNTER_TRIGGERED");
+    const counterEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "COUNTER_TRIGGERED" }> => e.type === "COUNTER_TRIGGERED",
+    );
     expect(counterEvent).toBeDefined();
-    if (counterEvent?.type === "COUNTER_TRIGGERED") {
-      expect(counterEvent.defenderTeamId).toBe(2);
-    }
+    expect(counterEvent?.defenderTeamId).toBe(2);
   });
 
   it("counter_triggers_bomb_chain: COUNTER backlash engulfs an adjacent BOMB -> triggers 3x3 explosion", () => {
@@ -318,15 +311,15 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
       skillType: "NONE",
     });
 
-    const bombEvent = events.find((e) => e.type === "BOMB_TRIGGERED");
+    const bombEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "BOMB_TRIGGERED" }> => e.type === "BOMB_TRIGGERED",
+    );
     expect(bombEvent).toBeDefined();
 
     // The BOMB at (9, 7) belonged to Team 1, so it must detonate FOR Team 1
-    if (bombEvent?.type === "BOMB_TRIGGERED") {
-      expect(bombEvent.coord).toEqual({ x: 9, y: 7 });
-      expect(bombEvent.teamId).toBe(1);
-      expect(bombEvent.factionId).toBe(1);
-    }
+    expect(bombEvent?.coord).toEqual({ x: 9, y: 7 });
+    expect(bombEvent?.teamId).toBe(1);
+    expect(bombEvent?.factionId).toBe(1);
 
     // Surrounding pieces in 3x3 of (9, 7) converted to Team 1:
     // Placed piece (9, 6) converted to Team 1
@@ -376,9 +369,7 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     expect(turn2.nextState.board[4]?.[2]?.teamId).toBe(2);
     expect(turn2.nextState.board[3]?.[2]?.teamId).toBe(2);
     expect(turn2.nextState.board[2]?.[2]?.teamId).toBe(2);
-    expect(
-      turn2.events.find((e) => e.type === "RAYCAST_BLOCKED"),
-    ).toBeUndefined();
+    expect(turn2.events.find((e) => e.type === "RAYCAST_BLOCKED")).toBeUndefined();
   });
 
   it("counter_bypassed_by_pierce_reverts_to_none_and_does_not_counter_later: COUNTER bypassed by PIERCE becomes NONE and does not trigger on next flip", () => {
@@ -411,9 +402,7 @@ describe("Skill Engine Specification Suite (skills.test.ts)", () => {
     });
 
     // Normal flip, COUNTER does not trigger
-    expect(
-      turn2.events.find((e) => e.type === "COUNTER_TRIGGERED"),
-    ).toBeUndefined();
+    expect(turn2.events.find((e) => e.type === "COUNTER_TRIGGERED")).toBeUndefined();
     expect(turn2.nextState.board[3]?.[2]?.teamId).toBe(2);
   });
 

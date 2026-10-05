@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import type { GameEvent } from "../types.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 import { createInitialState, dispatch } from "../pipeline.ts";
 
 describe("pipeline", () => {
@@ -36,12 +32,12 @@ describe("pipeline", () => {
     const placedEvent = events.find((e) => e.type === "PIECE_PLACED");
     expect(placedEvent).toBeDefined();
 
-    const flipEvent = events.find((e) => e.type === "FLIP_BATCH");
+    const flipEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+    );
     expect(flipEvent).toBeDefined();
-    if (flipEvent?.type === "FLIP_BATCH") {
-      expect(flipEvent.toTeamId).toBe(1);
-      expect(flipEvent.coords).toContainEqual({ x: 8, y: 7 });
-    }
+    expect(flipEvent?.toTeamId).toBe(1);
+    expect(flipEvent?.coords).toContainEqual({ x: 8, y: 7 });
   });
 
   it("Requirement 1: Raycast Blocking by WALL piece", () => {
@@ -73,11 +69,11 @@ describe("pipeline", () => {
     expect(nextState.board[3]?.[2]?.teamId).toBe(1);
 
     // Verify events
-    const blockedEvent = events.find((e) => e.type === "RAYCAST_BLOCKED");
+    const blockedEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "RAYCAST_BLOCKED" }> => e.type === "RAYCAST_BLOCKED",
+    );
     expect(blockedEvent).toBeDefined();
-    if (blockedEvent?.type === "RAYCAST_BLOCKED") {
-      expect(blockedEvent.coord).toEqual({ x: 4, y: 2 });
-    }
+    expect(blockedEvent?.coord).toEqual({ x: 4, y: 2 });
   });
 
   it("Requirement 2: Pierce Penetration through a WALL", () => {
@@ -133,12 +129,12 @@ describe("pipeline", () => {
     expect(nextState.board[2]?.[4]?.skillType).toBe("NONE");
     expect(nextState.board[2]?.[4]?.isRevealed).toBe(true);
 
-    const counterEvent = events.find((e) => e.type === "COUNTER_TRIGGERED");
+    const counterEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "COUNTER_TRIGGERED" }> => e.type === "COUNTER_TRIGGERED",
+    );
     expect(counterEvent).toBeDefined();
-    if (counterEvent?.type === "COUNTER_TRIGGERED") {
-      expect(counterEvent.defenderTeamId).toBe(2);
-      expect(counterEvent.reversedCoords).toContainEqual({ x: 2, y: 2 });
-    }
+    expect(counterEvent?.defenderTeamId).toBe(2);
+    expect(counterEvent?.reversedCoords).toContainEqual({ x: 2, y: 2 });
   });
 
   it("Requirement 4: Bomb Chain Reaction via Counter reversal hitting adjacent BOMB", () => {
@@ -162,11 +158,11 @@ describe("pipeline", () => {
     });
 
     // COUNTER triggered -> chained into BOMB at (3, 3)
-    const bombEvent = events.find((e) => e.type === "BOMB_TRIGGERED");
+    const bombEvent = events.find(
+      (e): e is Extract<GameEvent, { type: "BOMB_TRIGGERED" }> => e.type === "BOMB_TRIGGERED",
+    );
     expect(bombEvent).toBeDefined();
-    if (bombEvent?.type === "BOMB_TRIGGERED") {
-      expect(bombEvent.coord).toEqual({ x: 3, y: 3 });
-    }
+    expect(bombEvent?.coord).toEqual({ x: 3, y: 3 });
 
     // Bomb detonated -> reverted to NONE
     expect(nextState.board[3]?.[3]?.skillType).toBe("NONE");

@@ -1,14 +1,6 @@
-import type {
-  GameState,
-  MaskedGameState,
-  MaskedPiece,
-  Player,
-} from "./types.ts";
+import type { GameState, MaskedGameState, MaskedPiece, Player } from "./types.ts";
 
-export function sanitizeForViewer(
-  state: GameState,
-  viewerPlayerId: number,
-): MaskedGameState {
+export function sanitizeForViewer(state: GameState, viewerPlayerId: number): MaskedGameState {
   const viewer = state.players.find((p) => p.id === viewerPlayerId);
   const viewerTeamId = viewer?.teamId ?? -1;
 

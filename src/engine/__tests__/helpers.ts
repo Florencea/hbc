@@ -1,17 +1,10 @@
 import type { Board, GameState, Piece, Player } from "../types.ts";
 
 export function createEmptyBoard(size = 16): Board {
-  return Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => null),
-  );
+  return Array.from({ length: size }, () => Array.from({ length: size }, () => null));
 }
 
-export function setCell(
-  board: Board,
-  y: number,
-  x: number,
-  piece: Piece | null,
-): void {
+export function setCell(board: Board, y: number, x: number, piece: Piece | null): void {
   const row = board[y];
   if (row) {
     row[x] = piece;
@@ -27,12 +20,7 @@ export function makePiece(
   return { teamId, playerId, skillType, isRevealed };
 }
 
-function createTestPlayer(
-  id: number,
-  teamId: number,
-  name: string,
-  infiniteHand = true,
-): Player {
+function createTestPlayer(id: number, teamId: number, name: string, infiniteHand = true): Player {
   return {
     id,
     teamId,

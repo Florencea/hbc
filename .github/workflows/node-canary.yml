@@ -24,21 +24,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7
+      - name: Setup Vite+ with Node ${{ matrix.node-version }}
+        uses: voidzero-dev/setup-vp@v1
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
+          cache: true
 
-      - name: Install dependencies (Bypass Engine Strict)
-        run: npm ci --engine-strict=false
-        env:
-          NPM_CONFIG_ENGINE_STRICT: "false"
+      - name: Install dependencies
+        run: vp install
 
       - name: Build production bundle
         continue-on-error: true
-        run: npm run build
+        run: vp build
 
       - name: Run unit test suite
         continue-on-error: true
-        run: npm run agent:test:unit
+        run: vp run agent:test:unit

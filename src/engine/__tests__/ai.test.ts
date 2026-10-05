@@ -3,12 +3,7 @@ import { getPositionalWeight, selectBestMove } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { MapPreset } from "../types.ts";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 
 describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
   describe("Positional Weight Matrix", () => {
@@ -70,9 +65,7 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
         mapPreset: "CROSSROADS",
         boardSize: 16,
       });
-      const activePlayer = state.players.find(
-        (p) => p.id === state.activePlayerId,
-      );
+      const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
       expect(activePlayer).toBeDefined();
       if (!activePlayer) return;
 
@@ -90,13 +83,10 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const action = selectBestMove(state, activePlayer.id, "MEDIUM");
 
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        expect(action.skillType).not.toBe("NONE");
-        expect(action.skillType).toBe("WALL");
-        expect(activePlayer.hand[action.skillType ?? "NONE"]).toBeGreaterThan(
-          0,
-        );
-      }
+      const placeAction1 = action.type === "PLACE_PIECE" ? action : null;
+      expect(placeAction1?.skillType).not.toBe("NONE");
+      expect(placeAction1?.skillType).toBe("WALL");
+      expect(activePlayer.hand[placeAction1?.skillType ?? "NONE"]).toBeGreaterThan(0);
 
       // Must be a valid dispatch without throwing IllegalMoveError
       const res = dispatch(state, action);
@@ -115,20 +105,20 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const action = selectBestMove(state, 1, "MEDIUM");
 
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        const { x, y } = action.coord;
-        // Distance to friendly piece (4, 4) must be <= 2
-        const distFromFriendly = Math.max(Math.abs(x - 4), Math.abs(y - 4));
-        expect(distFromFriendly).toBeGreaterThanOrEqual(1);
-        expect(distFromFriendly).toBeLessThanOrEqual(2);
+      const placeAction2 = action.type === "PLACE_PIECE" ? action : null;
+      const x = placeAction2?.coord.x ?? -1;
+      const y = placeAction2?.coord.y ?? -1;
+      // Distance to friendly piece (4, 4) must be <= 2
+      const distFromFriendly = Math.max(Math.abs(x - 4), Math.abs(y - 4));
+      expect(distFromFriendly).toBeGreaterThanOrEqual(1);
+      expect(distFromFriendly).toBeLessThanOrEqual(2);
 
-        // It must bridge toward target (12, 12), so x > 4 and y > 4
-        expect(x).toBeGreaterThanOrEqual(4);
-        expect(y).toBeGreaterThanOrEqual(4);
-        // The closest pioneer tile to (12, 12) within Chebyshev <= 2 is (6, 6)
-        expect(x).toBe(6);
-        expect(y).toBe(6);
-      }
+      // It must bridge toward target (12, 12), so x > 4 and y > 4
+      expect(x).toBeGreaterThanOrEqual(4);
+      expect(y).toBeGreaterThanOrEqual(4);
+      // The closest pioneer tile to (12, 12) within Chebyshev <= 2 is (6, 6)
+      expect(x).toBe(6);
+      expect(y).toBe(6);
 
       // Verify dispatching pioneer move succeeds
       const { nextState, events } = dispatch(state, action);
@@ -203,11 +193,10 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
 
       const action = selectBestMove(state, 1, "MEDIUM");
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        expect(action.coord).toEqual({ x: 0, y: 0 });
-        // On a corner, WALL creates an impregnable corner wall and should beat BOMB
-        expect(action.skillType).toBe("WALL");
-      }
+      const placeAction3 = action.type === "PLACE_PIECE" ? action : null;
+      expect(placeAction3?.coord).toEqual({ x: 0, y: 0 });
+      // On a corner, WALL creates an impregnable corner wall and should beat BOMB
+      expect(placeAction3?.skillType).toBe("WALL");
     });
 
     it("ai_voluntarily_selects_pierce_to_penetrate_wall: chooses PIERCE over NONE when enemy wall is present", () => {
@@ -233,10 +222,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
 
       const action = selectBestMove(state, 1, "MEDIUM");
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        expect(action.coord).toEqual({ x: 2, y: 2 });
-        expect(action.skillType).toBe("PIERCE");
-      }
+      const placeAction4 = action.type === "PLACE_PIECE" ? action : null;
+      expect(placeAction4?.coord).toEqual({ x: 2, y: 2 });
+      expect(placeAction4?.skillType).toBe("PIERCE");
     });
 
     it("ai_voluntarily_selects_purify_against_dense_clusters: chooses PURIFY over NONE when adjacent to multiple enemies", () => {
@@ -267,10 +255,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
 
       const action = selectBestMove(state, 1, "MEDIUM");
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        expect(action.coord).toEqual({ x: 5, y: 5 });
-        expect(action.skillType).toBe("PURIFY");
-      }
+      const placeAction5 = action.type === "PLACE_PIECE" ? action : null;
+      expect(placeAction5?.coord).toEqual({ x: 5, y: 5 });
+      expect(placeAction5?.skillType).toBe("PURIFY");
     });
 
     it("ai_voluntarily_selects_counter_on_bait_square: chooses COUNTER on C-square to punish opponent recapture", () => {
@@ -296,10 +283,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
 
       const action = selectBestMove(state, 1, "MEDIUM");
       expect(action.type).toBe("PLACE_PIECE");
-      if (action.type === "PLACE_PIECE") {
-        expect(action.coord).toEqual({ x: 1, y: 0 });
-        expect(action.skillType).toBe("COUNTER");
-      }
+      const placeAction6 = action.type === "PLACE_PIECE" ? action : null;
+      expect(placeAction6?.coord).toEqual({ x: 1, y: 0 });
+      expect(placeAction6?.skillType).toBe("COUNTER");
     });
 
     it("ai_vs_ai_actively_deploys_special_skills: voluntary special moves occur frequently throughout match", () => {
@@ -312,9 +298,7 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       let totalMoves = 0;
 
       for (let turn = 0; turn < 40 && !state.isGameOver; turn++) {
-        const activePlayer = state.players.find(
-          (p) => p.id === state.activePlayerId,
-        );
+        const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
         const wasForced = activePlayer?.isForcedSpecial ?? false;
         const action = selectBestMove(state, state.activePlayerId, "MEDIUM");
         if (action.type === "PLACE_PIECE") {

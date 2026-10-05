@@ -64,13 +64,16 @@ const STARDUST_OFFSETS = [
   { x: -32, y: 12, delay: "200ms" },
 ];
 
+const EMPTY_PIERCE_STRIKES: PierceStrikeEffect[] = [];
+const EMPTY_ABYSS_VORTICES: AbyssVortexEffect[] = [];
+
 export function BoardOverlay({
   boardSize,
   blastWaves,
   auraPulses,
   shieldRipples,
-  pierceStrikes = [],
-  abyssVortices = [],
+  pierceStrikes = EMPTY_PIERCE_STRIKES,
+  abyssVortices = EMPTY_ABYSS_VORTICES,
   pioneerBridges,
 }: BoardOverlayProps) {
   const cellSizePercent = 100 / boardSize;
@@ -81,24 +84,12 @@ export function BoardOverlay({
       {pioneerBridges.length > 0 && (
         <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
-            <linearGradient
-              id="bridge-glow"
-              x1="0%"
-              y1="0%"
-              x2="100%"
-              y2="100%"
-            >
+            <linearGradient id="bridge-glow" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
               <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
             </linearGradient>
-            <filter
-              id="glow-filter"
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
+            <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
@@ -141,10 +132,7 @@ export function BoardOverlay({
           <div key={vortex.id} className="absolute inset-0">
             {/* SVG Lightning Rays Tracing Along Reversed Coordinates */}
             {vortex.reversedCoords.length > 0 && (
-              <svg
-                className="absolute inset-0 h-full w-full"
-                aria-hidden="true"
-              >
+              <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
                 <defs>
                   <filter
                     id={`void-glow-${vortex.id}`}
@@ -164,9 +152,7 @@ export function BoardOverlay({
                   const x2 = ((rc.x + 0.5) / boardSize) * 100;
                   const y2 = ((rc.y + 0.5) / boardSize) * 100;
                   return (
-                    <g
-                      key={`${rc.x.toString()}-${rc.y.toString()}-${idx.toString()}`}
-                    >
+                    <g key={`${rc.x.toString()}-${rc.y.toString()}-${idx.toString()}`}>
                       <line
                         x1={`${centerX.toString()}%`}
                         y1={`${centerY.toString()}%`}
@@ -239,13 +225,7 @@ export function BoardOverlay({
               aria-hidden="true"
             >
               <defs>
-                <linearGradient
-                  id={`hex-grad-${ripple.id}`}
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
+                <linearGradient id={`hex-grad-${ripple.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.95" />
                   <stop offset="50%" stopColor="#10b981" stopOpacity="0.75" />
                   <stop offset="100%" stopColor="#047857" stopOpacity="0.85" />
@@ -323,13 +303,7 @@ export function BoardOverlay({
               aria-hidden="true"
             >
               <defs>
-                <linearGradient
-                  id={`lance-grad-${pierce.id}`}
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
+                <linearGradient id={`lance-grad-${pierce.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#ffffff" />
                   <stop offset="50%" stopColor="#38bdf8" />
                   <stop offset="100%" stopColor="#0284c7" />
@@ -392,9 +366,9 @@ export function BoardOverlay({
             <div className="animate-bomb-core absolute h-1/3 w-1/3 rounded-full bg-linear-to-tr from-white via-yellow-200 to-rose-400 shadow-[0_0_30px_rgba(255,255,255,1)]" />
 
             {/* Flying Fiery Ember Particles */}
-            {EMBER_DIRECTIONS.map((dir, idx) => (
+            {EMBER_DIRECTIONS.map((dir) => (
               <div
-                key={idx}
+                key={`${dir.dx.toString()}_${dir.dy.toString()}`}
                 className="animate-shield-spark absolute h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,1)]"
                 style={{
                   transform: `translate(${dir.dx.toString()}px, ${dir.dy.toString()}px)`,
@@ -433,13 +407,7 @@ export function BoardOverlay({
               aria-hidden="true"
             >
               <defs>
-                <linearGradient
-                  id={`purify-grad-${aura.id}`}
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
+                <linearGradient id={`purify-grad-${aura.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
                   <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.75" />
                   <stop offset="100%" stopColor="#d97706" stopOpacity="0.6" />
@@ -495,9 +463,9 @@ export function BoardOverlay({
             </svg>
 
             {/* Ascending Holy Stardust Particles */}
-            {STARDUST_OFFSETS.map((pt, idx) => (
+            {STARDUST_OFFSETS.map((pt) => (
               <div
-                key={idx}
+                key={`${pt.x.toString()}_${pt.y.toString()}`}
                 className="animate-purify-sparkle absolute h-2 w-2 rounded-full bg-amber-200 shadow-[0_0_8px_rgba(254,240,138,1)]"
                 style={{
                   transform: `translate(${pt.x.toString()}px, ${pt.y.toString()}px)`,

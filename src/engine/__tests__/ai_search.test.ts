@@ -8,12 +8,7 @@ import {
   selectBestMoveMinimax,
 } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
-import {
-  createEmptyBoard,
-  makePiece,
-  makeTestState,
-  setCell,
-} from "./helpers.ts";
+import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 
 describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
   it("minimax_blocks_opponent_corner_capture: HARD AI looks ahead 2 plies and avoids moves that hand the opponent an immediate corner capture", () => {
@@ -48,12 +43,9 @@ describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
     const action = selectBestMove(state, 1, "HARD");
 
     expect(action.type).toBe("PLACE_PIECE");
-    if (action.type === "PLACE_PIECE") {
-      // AI must avoid (1, 0) which hands opponent corner (0, 0)
-      expect(action.coord).not.toEqual({ x: 1, y: 0 });
-      // AI chooses the safe interior move at (8, 8)
-      expect(action.coord).toEqual({ x: 8, y: 8 });
-    }
+    const placeAction1 = action.type === "PLACE_PIECE" ? action : null;
+    expect(placeAction1?.coord).not.toEqual({ x: 1, y: 0 });
+    expect(placeAction1?.coord).toEqual({ x: 8, y: 8 });
   });
 
   it("ai_prefers_pierce_when_counter_trap_suspected: when opponent COUNTER is active/likely, HARD AI favors PIERCE on high-value lines", () => {
@@ -91,14 +83,7 @@ describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
     const counterReady = isOpponentCounterReady(state, 1);
     expect(counterReady).toBe(true);
 
-    const riskNone = calculateRiskScore(
-      state.board,
-      state.size,
-      { x: 1, y: 5 },
-      1,
-      "NONE",
-      true,
-    );
+    const riskNone = calculateRiskScore(state.board, state.size, { x: 1, y: 5 }, 1, "NONE", true);
     const riskPierce = calculateRiskScore(
       state.board,
       state.size,
@@ -114,11 +99,10 @@ describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
     const action = selectBestMove(state, 1, "HARD");
 
     expect(action.type).toBe("PLACE_PIECE");
-    if (action.type === "PLACE_PIECE") {
-      expect(action.coord).toEqual({ x: 1, y: 5 });
-      // AI chooses PIERCE to safely bypass potential COUNTER backlash trap
-      expect(action.skillType).toBe("PIERCE");
-    }
+    const placeAction2 = action.type === "PLACE_PIECE" ? action : null;
+    expect(placeAction2?.coord).toEqual({ x: 1, y: 5 });
+    // AI chooses PIERCE to safely bypass potential COUNTER backlash trap
+    expect(placeAction2?.skillType).toBe("PIERCE");
   });
 
   it("pioneer_avoids_immediate_suicide_bridges: AI avoids pioneer tiles that immediately offer the opponent an advantageous sandwich", () => {
@@ -152,12 +136,11 @@ describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
     const action = selectBestMove(state, 1, "HARD");
 
     expect(action.type).toBe("PLACE_PIECE");
-    if (action.type === "PLACE_PIECE") {
-      // AI must avoid the suicide pioneer tile at (6, 6)
-      expect(action.coord).not.toEqual(suicideCoord);
-      // Verify dispatching does not throw
-      expect(() => dispatch(state, action)).not.toThrow();
-    }
+    const placeAction3 = action.type === "PLACE_PIECE" ? action : null;
+    // AI must avoid the suicide pioneer tile at (6, 6)
+    expect(placeAction3?.coord).not.toEqual(suicideCoord);
+    // Verify dispatching does not throw
+    expect(() => dispatch(state, action)).not.toThrow();
   });
 
   it("performance_within_budget: verify a 2-ply Minimax search evaluates 16x16 boards within reasonable time constraints (< 500ms)", () => {

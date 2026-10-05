@@ -3,13 +3,10 @@
 @theme {
   --color-board-bg: #1e293b;
   --color-board-grid: #334155;
-  --animate-board-shake: boardShake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97)
-    both;
+  --animate-board-shake: boardShake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
   --animate-piece-flip: pieceFlip 0.35s ease-in-out both;
-  --animate-piece-pop: piecePop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)
-    both;
-  --animate-float-combat: floatCombat 1.2s cubic-bezier(0.16, 1, 0.3, 1)
-    forwards;
+  --animate-piece-pop: piecePop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  --animate-float-combat: floatCombat 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 
   /* Skill 1: WALL (Emerald Hexagonal Shield) */
   --animate-hex-shield: hexShield 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -17,8 +14,7 @@
   --animate-shield-ripple: shieldRipple 0.55s ease-out forwards;
 
   /* Skill 2: PIERCE (Sky Lance & Sonic Boom Ring) */
-  --animate-pierce-lance: pierceLance 0.5s cubic-bezier(0.16, 1, 0.3, 1)
-    forwards;
+  --animate-pierce-lance: pierceLance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-pierce-ring: pierceRing 0.5s ease-out forwards;
 
   /* Skill 3: BOMB (Incandescent Core & Fiery 3x3 Blast) */
@@ -27,14 +23,12 @@
   --animate-blast-wave: blastWave 0.65s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 
   /* Skill 4: PURIFY (Sacred Golden Mandala & Ascending Stardust) */
-  --animate-purify-mandala: purifyMandala 0.7s cubic-bezier(0.16, 1, 0.3, 1)
-    forwards;
+  --animate-purify-mandala: purifyMandala 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-purify-sparkle: purifySparkle 0.7s ease-out forwards;
   --animate-aura-pulse: auraPulse 0.7s ease-out forwards;
 
   /* Skill 5: COUNTER (Abyssal Singularity & Reversal Lightning) */
-  --animate-abyss-singularity: abyssSingularity 0.7s
-    cubic-bezier(0.7, 0, 0.3, 1) forwards;
+  --animate-abyss-singularity: abyssSingularity 0.7s cubic-bezier(0.7, 0, 0.3, 1) forwards;
   --animate-abyss-lightning: abyssLightning 0.55s ease-out forwards;
 }
 

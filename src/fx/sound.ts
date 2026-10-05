@@ -27,10 +27,7 @@ export function toggleAudioMuted(): boolean {
   return isMuted;
 }
 
-function createNoiseBuffer(
-  ctx: AudioContext,
-  durationSec: number,
-): AudioBuffer {
+function createNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffer {
   const bufferSize = Math.floor(ctx.sampleRate * durationSec);
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);

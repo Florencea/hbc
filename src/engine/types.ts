@@ -3,13 +3,12 @@ export interface Coord {
   y: number;
 }
 
-export type SkillType =
-  "NONE" | "WALL" | "PIERCE" | "BOMB" | "PURIFY" | "COUNTER";
+export type SkillType = "NONE" | "WALL" | "PIERCE" | "BOMB" | "PURIFY" | "COUNTER";
 
-export const SKILL_SPECS: Record<
-  Exclude<SkillType, "NONE">,
-  { cd: number; maxHand: number }
-> = {
+export const SPECIAL_SKILL_TYPES = ["PIERCE", "BOMB", "WALL", "PURIFY", "COUNTER"] as const;
+export type SpecialSkillType = (typeof SPECIAL_SKILL_TYPES)[number];
+
+export const SKILL_SPECS: Record<SpecialSkillType, { cd: number; maxHand: number }> = {
   PIERCE: { cd: 3, maxHand: 2 },
   BOMB: { cd: 4, maxHand: 2 },
   WALL: { cd: 4, maxHand: 1 },

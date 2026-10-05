@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createInitialGame, dispatch } from "./pipeline.ts";
 import { sanitizeForViewer } from "./sanitize.ts";
 import {
@@ -55,9 +56,7 @@ export interface ReplaySession {
   getTotalSteps(): number;
   getCurrentStep(): MatchStepRecord | null;
   getCurrentState(): GameState;
-  getCurrentMaskedState(
-    viewerPlayerId?: number | null,
-  ): MaskedGameState | GameState;
+  getCurrentMaskedState(viewerPlayerId?: number | null): MaskedGameState | GameState;
   canStepForward(): boolean;
   canStepBackward(): boolean;
   stepForward(): { state: GameState; step: MatchStepRecord } | null;
@@ -71,11 +70,7 @@ export interface ReplaySession {
  * Live tracker for building match history as actions are dispatched.
  */
 export interface MatchTracker {
-  recordStep(
-    action: Action,
-    nextState: GameState,
-    events: GameEvent[],
-  ): MatchStepRecord;
+  recordStep(action: Action, nextState: GameState, events: GameEvent[]): MatchStepRecord;
   getHistory(): MatchHistory;
   reset(initialState: GameState, matchId?: string): void;
 }
@@ -168,22 +163,15 @@ export function formatActionNotation(
   if (isPioneer) annotations.push("pioneer:1");
   if (totalFlips > 0) annotations.push(`flips:${totalFlips.toString()}`);
   if (wallBlocks > 0) annotations.push(`block:${wallBlocks.toString()}`);
-  if (penetrations > 0)
-    annotations.push(`penetrate:${penetrations.toString()}`);
+  if (penetrations > 0) annotations.push(`penetrate:${penetrations.toString()}`);
   if (bombDetonations > 0) {
-    annotations.push(
-      `bomb:${bombDetonations.toString()}(${bombAffected.toString()})`,
-    );
+    annotations.push(`bomb:${bombDetonations.toString()}(${bombAffected.toString()})`);
   }
   if (counterTriggers > 0) {
-    annotations.push(
-      `counter:${counterTriggers.toString()}(${counterReversed.toString()})`,
-    );
+    annotations.push(`counter:${counterTriggers.toString()}(${counterReversed.toString()})`);
   }
   if (purifyPulses > 0) {
-    annotations.push(
-      `purify:${purifyPulses.toString()}(${purifyAffected.toString()})`,
-    );
+    annotations.push(`purify:${purifyPulses.toString()}(${purifyAffected.toString()})`);
   }
 
   if (annotations.length > 0) {
@@ -215,8 +203,7 @@ function jsonInfinityReviver(key: string, value: unknown): unknown {
  * Deep clones a GameState object while correctly preserving `Infinity` hand values.
  */
 function cloneGameState(state: GameState): GameState {
-  const json = JSON.stringify(state, jsonInfinityReplacer);
-  return JSON.parse(json, jsonInfinityReviver) as GameState;
+  return structuredClone(state);
 }
 
 /**
@@ -226,22 +213,55 @@ export function serializeMatchHistoryToJson(history: MatchHistory): string {
   return JSON.stringify(history, jsonInfinityReplacer, 2);
 }
 
+const MatchMetadataSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  mapPreset: z.enum(["CROSSROADS", "ARCHIPELAGO", "TRENCHES"]),
+  boardSize: z.number(),
+  players: z.array(
+    z.object({
+      id: z.number(),
+      teamId: z.number(),
+      name: z.string(),
+    }),
+  ),
+  winnerTeamId: z.number().nullable(),
+  totalTurns: z.number(),
+  isGameOver: z.boolean(),
+});
+
+const MatchStepRecordSchema = z.object({
+  stepIndex: z.number(),
+  turnNumber: z.number(),
+  playerId: z.number(),
+  action: z.custom<Action>((val) => typeof val === "object" && val !== null && "type" in val),
+  events: z.array(
+    z.custom<GameEvent>((val) => typeof val === "object" && val !== null && "type" in val),
+  ),
+  notation: z.string(),
+  stateSnapshot: z.custom<GameState>(
+    (val) => typeof val === "object" && val !== null && "board" in val,
+  ),
+});
+
+const MatchHistorySchema = z.object({
+  metadata: MatchMetadataSchema,
+  initialState: z.custom<GameState>(
+    (val) => typeof val === "object" && val !== null && "board" in val,
+  ),
+  steps: z.array(MatchStepRecordSchema),
+});
+
 /**
  * Deserializes a JSON string back into a full MatchHistory object.
  */
 export function deserializeMatchHistoryFromJson(jsonStr: string): MatchHistory {
-  const parsed = JSON.parse(jsonStr, jsonInfinityReviver) as unknown;
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    !("metadata" in parsed) ||
-    !("initialState" in parsed) ||
-    !("steps" in parsed) ||
-    !Array.isArray((parsed as { steps: unknown }).steps)
-  ) {
+  const parsed: unknown = JSON.parse(jsonStr, jsonInfinityReviver);
+  const result = MatchHistorySchema.safeParse(parsed);
+  if (!result.success) {
     throw new Error("Invalid HBC match history JSON: missing required fields");
   }
-  return parsed as MatchHistory;
+  return result.data;
 }
 
 /**
@@ -309,9 +329,7 @@ export function parseHbcPgn(pgnString: string): ParsedHbcPgn {
     const trimmed = line.trim();
     if (inHeaders) {
       if (trimmed.startsWith("[")) {
-        const headerMatch = /^\s*\[([A-Za-z0-9_]+)\s+"([^"]*)"\]\s*$/.exec(
-          trimmed,
-        );
+        const headerMatch = /^\s*\[([A-Za-z0-9_]+)\s+"([^"]*)"\]\s*$/.exec(trimmed);
         if (headerMatch?.[1] && headerMatch[2] !== undefined) {
           headers[headerMatch[1]] = headerMatch[2];
         }
@@ -352,7 +370,7 @@ export function parseHbcPgn(pgnString: string): ParsedHbcPgn {
   while ((tokenMatch = tokenRegex.exec(moveBody)) !== null) {
     const playerId = parseInt(tokenMatch[2] ?? "1", 10);
     const target = tokenMatch[3]?.toUpperCase();
-    const skillRaw = tokenMatch[4]?.toUpperCase() as SkillType | undefined;
+    const skillRaw = tokenMatch[4]?.toUpperCase();
 
     if (target === "PASS") {
       actions.push({
@@ -452,10 +470,7 @@ export function replayMatchActions(
 /**
  * Creates a ReplaySession controller for stepping through recorded matches.
  */
-export function createReplaySession(
-  history: MatchHistory,
-  initialIndex?: number,
-): ReplaySession {
+export function createReplaySession(history: MatchHistory, initialIndex?: number): ReplaySession {
   const totalSteps = history.steps.length;
   let currentIndex =
     initialIndex !== undefined
@@ -490,9 +505,7 @@ export function createReplaySession(
       return step ? step.stateSnapshot : history.initialState;
     },
 
-    getCurrentMaskedState(
-      viewerPlayerId?: number | null,
-    ): MaskedGameState | GameState {
+    getCurrentMaskedState(viewerPlayerId?: number | null): MaskedGameState | GameState {
       const state = this.getCurrentState();
       if (viewerPlayerId == null) {
         return state;
@@ -561,10 +574,7 @@ export function createReplaySession(
 /**
  * Creates a MatchTracker instance for recording live moves as they occur.
  */
-export function createMatchTracker(
-  initialState: GameState,
-  matchId?: string,
-): MatchTracker {
+export function createMatchTracker(initialState: GameState, matchId?: string): MatchTracker {
   let history: MatchHistory = {
     metadata: {
       id: matchId ?? `match-${Date.now().toString()}`,
@@ -585,11 +595,7 @@ export function createMatchTracker(
   };
 
   return {
-    recordStep(
-      action: Action,
-      nextState: GameState,
-      events: GameEvent[],
-    ): MatchStepRecord {
+    recordStep(action: Action, nextState: GameState, events: GameEvent[]): MatchStepRecord {
       const stepIndex = history.steps.length;
       const notation = formatActionNotation(action, events, stepIndex + 1);
       const stateSnapshot = cloneGameState(nextState);
