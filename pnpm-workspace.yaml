@@ -37,3 +37,4 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
     vitest: "*"
+saveExact: true
