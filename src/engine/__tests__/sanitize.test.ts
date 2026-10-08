@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getAvailableMoves } from "../raycast.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { GameState } from "../types.ts";

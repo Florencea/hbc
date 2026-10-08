@@ -6,11 +6,12 @@ import { playwright } from "vite-plus/test/browser-playwright";
 export default defineConfig({
   base: process.env.BASE_PATH ?? "/",
   optimizeDeps: {
-    include: ["clsx", "tailwind-merge"],
+    include: ["clsx", "tailwind-merge", "react-dom/client"],
   },
   run: {
     cache: {
       scripts: true,
+      tasks: true,
     },
   },
   build: {

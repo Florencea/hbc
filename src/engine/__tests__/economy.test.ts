@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import { SKILL_SPECS, type Board, type GameEvent, type GameState, type Player } from "../types.ts";

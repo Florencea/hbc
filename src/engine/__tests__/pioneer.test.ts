@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { IllegalMoveError } from "../map.ts";
 import { dispatch } from "../pipeline.ts";
 import { getAvailableMoves, getLegalMoves, getPioneerMoves } from "../raycast.ts";

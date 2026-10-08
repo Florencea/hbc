@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { traceRay, getLegalMoves, isValidCoord } from "../raycast.ts";
 import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 

@@ -1,11 +1,10 @@
 import { describe, expect, test } from "vite-plus/test";
-import { render } from "vitest-browser-react";
-import App from "../../src/App.tsx";
+import { renderApp } from "../test-utils.tsx";
 import "../../src/global.css";
 
 describe("HBC Game Smoke Test in Browser Mode", () => {
   test("renders main heading, board layout, and controls", async () => {
-    const screen = await render(<App />);
+    const screen = await renderApp();
 
     // Verify main heading
     const heading = screen.getByRole("heading", { level: 1 });
@@ -22,7 +21,7 @@ describe("HBC Game Smoke Test in Browser Mode", () => {
   });
 
   test("activates visual replay mode, timeline controls, and export modal", async () => {
-    const screen = await render(<App />);
+    const screen = await renderApp();
 
     // Switch to AI vs AI mode
     const dualAiBtn = screen.getByRole("button", { name: "⚔️ 雙 AI 演示" });
@@ -63,7 +62,7 @@ describe("HBC Game Smoke Test in Browser Mode", () => {
   });
 
   test("opens import modal successfully", async () => {
-    const screen = await render(<App />);
+    const screen = await renderApp();
 
     const importBtn = screen.getByRole("button", { name: "📤 載入" });
     await importBtn.click();

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { getPositionalWeight, selectBestMove } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";

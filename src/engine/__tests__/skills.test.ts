@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
 import { dispatch, resolveAction } from "../pipeline.ts";
 import type { GameEvent } from "../types.ts";
