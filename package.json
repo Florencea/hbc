@@ -22,7 +22,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwind-merge": "3.7.0",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/language-server": "0.16.0",
@@ -33,7 +33,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "@vitest/browser-playwright": "catalog:",
     "knip": "6.41.0",
-    "oxc-transform-react": "0.153.0",
+    "oxc-transform-react": "0.154.0",
     "playwright": "1.64.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
