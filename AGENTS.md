@@ -18,14 +18,14 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 
 ## 1. Quick Architecture Map
 
-| Layer          | Path              | Responsibility                                        |
-| :------------- | :---------------- | :---------------------------------------------------- |
-| **Engine**     | `src/engine/`     | Headless 16x16 Reversi engine & Fog of War            |
-| **FX & Audio** | `src/fx/`         | Sound synthesizers & event choreography               |
-| **Components** | `src/components/` | Modular React 19 UI component tree                    |
-| **App Root**   | `src/App.tsx`     | Game controller, loop, and match telemetry            |
-| **E2E Smoke**  | `test/e2e/`       | Headless Vitest Playwright browser tests              |
-| **Rules**      | `.agents/rules/`  | Domain rules (`engine`, `ui-styling`, `localization`) |
+| Layer          | Path              | Responsibility                                              |
+| :------------- | :---------------- | :---------------------------------------------------------- |
+| **Engine**     | `src/engine/`     | Headless 16x16 Reversi engine & Fog of War                  |
+| **FX & Audio** | `src/fx/`         | Sound synthesizers & event choreography                     |
+| **Components** | `src/components/` | Modular React 19 UI component tree                          |
+| **App Root**   | `src/App.tsx`     | Game controller, loop, and match telemetry                  |
+| **E2E Smoke**  | `test/e2e/`       | Headless Vitest Playwright browser tests                    |
+| **Rules**      | `.agents/rules/`  | Domain rules (`engine`, `ui-styling`, `localization`, `ci`) |
 
 ---
 
@@ -37,17 +37,18 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 - **Tailwind SSOT**: Tailwind CSS v4 `@theme` in `src/global.css` is the sole design token source. Merged classes use `cn(...)`.
 - **Zod Defense**: Untrusted external data (notations, JSON) must be validated with Zod. Never use unsafe casts.
 - **Zero Suppression**: Never use `// @ts-ignore`, `// @ts-expect-error`, or `/* oxlint-disable */`.
+- **Major Action Versioning**: All GitHub Actions must track latest Major tags (e.g. `@v1`, `@v7`) without pinning exact minor/patch versions.
 
 ---
 
 ## 3. Verification Ladder
 
-- **Inner Loop**: `npm run agent:verify:inner` (`vp check && node scripts/lint-tailwind.ts`)
-- **Unit Suite**: `npm run agent:test:unit` (`vp test run --project unit --reporter=tap-flat --no-color`)
-- **E2E Smoke**: `npm run agent:test:e2e` (`vp test run --project e2e --reporter=tap-flat --no-color`)
-- **Unified Gate**: `npm run agent:verify:gate`
-- **Full Verification**: `npm run verify`
-- **CI Lint**: `npm run agent:lint:ci` (`actionlint`)
+- **Inner Loop**: `vpr agent:verify:inner` (`vp check && node scripts/lint-tailwind.ts`)
+- **Unit Suite**: `vpr agent:test:unit` (`vp test run --project unit --reporter=tap-flat --no-color`)
+- **E2E Smoke**: `vpr agent:test:e2e` (`vp test run --project e2e --reporter=tap-flat --no-color`)
+- **Unified Gate**: `vpr agent:verify:gate`
+- **Full Verification**: `vpr verify`
+- **CI Lint**: `vpr agent:lint:ci` (`actionlint`)
 
 ---
 
