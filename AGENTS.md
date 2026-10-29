@@ -18,14 +18,14 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 
 ## 1. Quick Architecture Map
 
-| Layer          | Path              | Responsibility                                 |
-| :------------- | :---------------- | :--------------------------------------------- |
-| **Engine**     | `src/engine/`     | Headless 16x16 Reversi engine & Fog of War     |
-| **FX & Audio** | `src/fx/`         | Sound synthesizers & event choreography        |
-| **Components** | `src/components/` | Modular React 19 UI component tree             |
-| **App Root**   | `src/App.tsx`     | Game controller, loop, and match telemetry     |
-| **E2E Smoke**  | `test/e2e/`       | Headless Vitest Playwright browser tests       |
-| **Rules**      | `.agents/rules/`  | Domain rules (`engine`, `ui`, `locales`, `ci`) |
+| Layer          | Path              | Responsibility                                        |
+| :------------- | :---------------- | :---------------------------------------------------- |
+| **Engine**     | `src/engine/`     | Headless 16x16 Reversi engine & Fog of War            |
+| **FX & Audio** | `src/fx/`         | Sound synthesizers & event choreography               |
+| **Components** | `src/components/` | Modular React 19 UI component tree                    |
+| **App Root**   | `src/App.tsx`     | Game controller, loop, and match telemetry            |
+| **E2E Smoke**  | `test/e2e/`       | Headless Vitest Playwright browser tests              |
+| **Rules**      | `.agents/rules/`  | Domain rules (`engine`, `ui-styling`, `localization`) |
 
 ---
 

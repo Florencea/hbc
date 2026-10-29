@@ -1,6 +1,6 @@
 ---
 trigger: glob
-globs: "src/engine/**"
+globs: "src/engine/**, test/**"
 description: Headless Game Engine architectural conventions, Fog of War, anti-sonar probing, and deterministic event dispatching.
 ---
 
@@ -37,3 +37,16 @@ description: Headless Game Engine architectural conventions, Fog of War, anti-so
 - **AI Engine Isolation**: AI evaluation functions (`selectBestMove`, `selectBestMoveMinimax`) must remain headless, synchronous or Web-Worker-compatible, and operate strictly on sanitized states (`sanitizeForViewer`) to prevent any information leaks.
 - **Search Time Budget**: Search depth algorithms (Minimax with Alpha-Beta pruning) must enforce branch pruning or evaluation limits to stay strictly under 350ms per turn in both Node and browser execution environments.
 - **Asynchronous Engine Evolution**: Serializable actions and state snapshots to support undo/redo and match replay features without in-place state mutation.
+
+## 5. Game Mechanics Test Coverage Specifications
+
+All game mechanics must maintain comprehensive test coverage in pure Node/TypeScript (`src/engine/__tests__/`):
+
+1. 8-direction raycast and boundary conditions.
+2. Multi-team ally/enemy logic.
+3. `WALL` blocking and `PIERCE` penetration.
+4. `COUNTER` reversal mechanics.
+5. `BOMB` 3x3 explosion and recursive chain reaction.
+6. `PURIFY` pulse aura and 3-turn lifespan decay.
+7. Fog of war sanitization for opponent and teammate perspectives.
+8. Optimistic blind moves into hidden `WALL`s with 0 captures and anti-sonar sanitized move equivalence.
