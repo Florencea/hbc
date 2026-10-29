@@ -18,6 +18,10 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
 jobs:
   gatekeeper:
     name: Tier 1 Gatekeeper (Linux / Strict Engine)
@@ -31,9 +35,31 @@ jobs:
         with:
           node-version-file: package.json
           cache: true
+          cache-toolchain: true
 
       - name: Install dependencies
         run: vp install
+
+      - name: Cache Vite+ task cache
+        uses: actions/cache@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ runner.os }}-vite-task-${{ hashFiles('package.json', 'vite.config.ts') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vite-task-${{ hashFiles('package.json', 'vite.config.ts') }}-
+            ${{ runner.os }}-vite-task-
+
+      - name: Run inner loop verification (Oxlint & Oxfmt & Tailwind)
+        run: vp run agent:verify:inner
+
+      - name: Run dead code and unused export check (Knip)
+        run: vp run check:deadcode
+
+      - name: Run unit test suite
+        run: vp run agent:test:unit
+
+      - name: Build production bundle
+        run: vp build
 
       - name: Get Playwright version
         id: playwright-version
@@ -53,18 +79,6 @@ jobs:
 
       - name: Install Playwright system dependencies on Linux
         run: vp exec playwright install-deps chromium
-
-      - name: Run inner loop verification (Oxlint & Oxfmt & Tailwind)
-        run: vp run agent:verify:inner
-
-      - name: Run dead code and unused export check (Knip)
-        run: vp run check:deadcode
-
-      - name: Run unit test suite
-        run: vp run agent:test:unit
-
-      - name: Build production bundle
-        run: vp build
 
       - name: Run Playwright E2E smoke tests
         run: vp run agent:test:e2e
@@ -96,6 +110,7 @@ jobs:
         with:
           node-version-file: package.json
           cache: true
+          cache-toolchain: true
 
       - name: Install dependencies
         run: vp install

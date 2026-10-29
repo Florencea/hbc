@@ -41,6 +41,7 @@ jobs:
         with:
           node-version-file: package.json
           cache: true
+          cache-toolchain: true
 
       - name: Install dependencies
         run: vp install
