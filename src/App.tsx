@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AbyssVortexEffect,
   type AuraPulseEffect,
@@ -149,6 +149,7 @@ export default function App() {
   // Animation and Visual FX states
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [intermediateBoard, setIntermediateBoard] = useState<Board | null>(null);
+  const intermediateBoardRef = useRef<Board | null>(null);
   const [flippingCoords, setFlippingCoords] = useState<Set<string>>(() => new Set());
   const [poppingCoord, setPoppingCoord] = useState<Coord | null>(null);
   const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
@@ -316,28 +317,39 @@ export default function App() {
       }
 
       setIsAnimating(true);
-      let currentIntermediateBoard: Board = gameState.board.map((row) =>
+      const initialIntermediateBoard: Board = gameState.board.map((row) =>
         row.map((cell) => (cell ? { ...cell } : null)),
       );
-      setIntermediateBoard(currentIntermediateBoard);
+      intermediateBoardRef.current = initialIntermediateBoard;
+      setIntermediateBoard(initialIntermediateBoard);
+
+      const updateIntermediateBoard = (updater: (prev: Board) => Board): Board => {
+        const current = intermediateBoardRef.current ?? gameState.board;
+        const next = updater(current);
+        intermediateBoardRef.current = next;
+        setIntermediateBoard(next);
+        return next;
+      };
 
       try {
         await playEvents(events, {
           onPiecePlaced: (pos, piece) => {
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+              ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
             setPoppingCoord(pos);
             setTimeout(() => {
               setPoppingCoord(null);
             }, 180);
           },
           onPioneerPlaced: (pos, piece) => {
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+            const next = updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+              ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
             setPoppingCoord(pos);
             setTimeout(() => {
               setPoppingCoord(null);
@@ -345,8 +357,8 @@ export default function App() {
 
             let closest: Coord | null = null;
             let minDistance = Infinity;
-            for (let y = 0; y < currentIntermediateBoard.length; y++) {
-              const row = currentIntermediateBoard[y];
+            for (let y = 0; y < next.length; y++) {
+              const row = next[y];
               if (!row) continue;
               for (let x = 0; x < row.length; x++) {
                 if (x === pos.x && y === pos.y) continue;
@@ -369,30 +381,32 @@ export default function App() {
             }
           },
           onPieceRevealed: (pos, skillType) => {
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) =>
-                rX === pos.x && rY === pos.y && cell
-                  ? { ...cell, skillType, isRevealed: true }
-                  : cell,
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) =>
+                  rX === pos.x && rY === pos.y && cell
+                    ? { ...cell, skillType, isRevealed: true }
+                    : cell,
+                ),
               ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
           },
           onPieceFlip: (pos, toTeamId) => {
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) =>
-                rX === pos.x && rY === pos.y && cell
-                  ? {
-                      ...cell,
-                      teamId: toTeamId,
-                      skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
-                      duration: undefined,
-                      isRevealed: true,
-                    }
-                  : cell,
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) =>
+                  rX === pos.x && rY === pos.y && cell
+                    ? {
+                        ...cell,
+                        teamId: toTeamId,
+                        skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                        duration: undefined,
+                        isRevealed: true,
+                      }
+                    : cell,
+                ),
               ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
             const key = `${pos.x.toString()},${pos.y.toString()}`;
             setFlippingCoords((prev) => new Set(prev).add(key));
             setTimeout(() => {
@@ -423,24 +437,25 @@ export default function App() {
             );
             reversedSet.add(`${center.x.toString()},${center.y.toString()}`);
 
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) => {
-                if (reversedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
-                  if (cell.skillType === "PIERCE") {
-                    return { ...cell, isRevealed: true };
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) => {
+                  if (reversedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                    if (cell.skillType === "PIERCE") {
+                      return { ...cell, isRevealed: true };
+                    }
+                    return {
+                      ...cell,
+                      teamId: defenderTeamId,
+                      skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                      duration: undefined,
+                      isRevealed: true,
+                    };
                   }
-                  return {
-                    ...cell,
-                    teamId: defenderTeamId,
-                    skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
-                    duration: undefined,
-                    isRevealed: true,
-                  };
-                }
-                return cell;
-              }),
+                  return cell;
+                }),
+              ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
 
             const vortexId = `${Date.now().toString()}-${Math.random().toString()}`;
             setAbyssVortices((prev) => [...prev, { id: vortexId, center, reversedCoords }]);
@@ -450,24 +465,25 @@ export default function App() {
           },
           onBombTriggered: (center, blastCoords, teamId) => {
             const blastSet = new Set(blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`));
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) => {
-                if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
-                  if (cell.skillType === "PIERCE") {
-                    return { ...cell, isRevealed: true };
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) => {
+                  if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                    if (cell.skillType === "PIERCE") {
+                      return { ...cell, isRevealed: true };
+                    }
+                    return {
+                      ...cell,
+                      teamId,
+                      skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                      duration: undefined,
+                      isRevealed: true,
+                    };
                   }
-                  return {
-                    ...cell,
-                    teamId,
-                    skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
-                    duration: undefined,
-                    isRevealed: true,
-                  };
-                }
-                return cell;
-              }),
+                  return cell;
+                }),
+              ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
 
             const blastId = `${Date.now().toString()}-${Math.random().toString()}`;
             setBlastWaves((prev) => [...prev, { id: blastId, center }]);
@@ -479,24 +495,25 @@ export default function App() {
             const affectedSet = new Set(
               affectedCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
             );
-            currentIntermediateBoard = currentIntermediateBoard.map((row, rY) =>
-              row.map((cell, rX) => {
-                if (affectedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
-                  const nextSkill =
-                    cell.skillType === "BOMB" || cell.skillType === "COUNTER"
-                      ? "NONE"
-                      : cell.skillType;
-                  return {
-                    ...cell,
-                    teamId,
-                    skillType: nextSkill,
-                    isRevealed: true,
-                  };
-                }
-                return cell;
-              }),
+            updateIntermediateBoard((board) =>
+              board.map((row, rY) =>
+                row.map((cell, rX) => {
+                  if (affectedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                    const nextSkill =
+                      cell.skillType === "BOMB" || cell.skillType === "COUNTER"
+                        ? "NONE"
+                        : cell.skillType;
+                    return {
+                      ...cell,
+                      teamId,
+                      skillType: nextSkill,
+                      isRevealed: true,
+                    };
+                  }
+                  return cell;
+                }),
+              ),
             );
-            setIntermediateBoard(currentIntermediateBoard);
 
             const auraId = `${Date.now().toString()}-${Math.random().toString()}`;
             setAuraPulses((prev) => [...prev, { id: auraId, center }]);
@@ -536,6 +553,7 @@ export default function App() {
         }
       } finally {
         setIsAnimating(false);
+        intermediateBoardRef.current = null;
         setIntermediateBoard(null);
       }
     },
