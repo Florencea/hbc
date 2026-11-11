@@ -43,7 +43,7 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 
 ## 3. Verification Ladder
 
-- **Inner Loop**: `vpr agent:verify:inner` (`vp check && node scripts/lint-tailwind.ts`)
+- **Inner Loop**: `vpr agent:verify:inner` (`vpr typecheck && vp lint && vpr agent:lint:tailwind`)
 - **Unit Suite**: `vpr agent:test:unit` (`vp test run --project unit --reporter=tap-flat --no-color`)
 - **E2E Smoke**: `vpr agent:test:e2e` (`vp test run --project e2e --reporter=tap-flat --no-color`)
 - **Unified Gate**: `vpr agent:verify:gate`
