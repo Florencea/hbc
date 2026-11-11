@@ -93,10 +93,10 @@ For autonomous coding agents and automated CI environments, a specialized, zero-
 The repository enforces a high-efficiency GitHub Actions automation strategy:
 
 1. **Daily CI Pipeline (`.github/workflows/ci.yml`)**:
-   - **Tier 1 (`gatekeeper`)**: Runs on `ubuntu-latest` against the authoritative Node.js runtime (`package.json` engines, v24 Active LTS). Executes clean installation (`npm ci`), browser dependencies (`playwright install --with-deps chromium`), static analysis, unit test suite, production build, and Playwright E2E smoke tests. On failure, Playwright traces and test artifacts are captured via `actions/upload-artifact@v7`.
-   - **Tier 2 (`platform-compat`)**: Executes upon Tier 1 success (`needs: [gatekeeper]`) across `windows-latest` and `macos-latest`. Validates native toolchain bindings (e.g. Rolldown, LightningCSS) and operating system path separator handling (`\` vs `/`) using `build` and unit tests, eliminating duplicate static analysis or heavy browser runners.
+   - **Tier 1 (`gatekeeper`)**: Runs on `ubuntu-24.04` against the authoritative Node.js runtime (`package.json` engines, v24 Active LTS). Executes clean installation (`npm ci`), browser dependencies (`playwright install --with-deps chromium`), static analysis, unit test suite, production build, and Playwright E2E smoke tests. On failure, Playwright traces and test artifacts are captured via `actions/upload-artifact@v7`.
+   - **Tier 2 (`platform-compat`)**: Executes upon Tier 1 success (`needs: [gatekeeper]`) across `windows-2025` and `macos-26`. Validates native toolchain bindings (e.g. Rolldown, LightningCSS) and operating system path separator handling (`\` vs `/`) using `build` and unit tests, eliminating duplicate static analysis or heavy browser runners.
 2. **Upstream Runtime Canary (`.github/workflows/node-canary.yml`)**:
-   - Runs weekly via cron (`0 3 * * 1` - Mondays 03:00 UTC) and manual trigger (`workflow_dispatch`) on `ubuntu-latest`.
+   - Runs weekly via cron (`0 3 * * 1` - Mondays 03:00 UTC) and manual trigger (`workflow_dispatch`) on `ubuntu-24.04`.
    - Tests against upcoming Node.js 26 (Current line moving toward Active LTS in Oct 2026).
    - Bypasses strict engine constraints (`--engine-strict=false`) and executes build and unit tests with `continue-on-error: true` to surface upstream diagnostics without breaking repository pass status.
 3. **Workflow Syntax & Expression Linting**:
