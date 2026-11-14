@@ -16,18 +16,17 @@ Guidelines for maintaining GitHub Actions CI/CD workflows and automated pipeline
 
 ## 2. Centralized Workflows (`Florencea/vp-actions`)
 
-- **Centralized Pipeline**: Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`.
+- **Centralized Pipeline**: Web and Fullstack applications consume the centralized Reusable Workflow from `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0` (`ubuntu-24.04`).
 - **Inputs Configuration**:
-  - `enable-platform-compat`: Set to `true` to execute cross-platform matrix checks (Windows, macOS).
   - `pre-test-command`: Pass repository-specific preparation hooks when applicable.
-- **Specialized Composite Actions**: Workflows with custom deployment or execution requirements consume modular composite actions:
-  - `Florencea/vp-actions/actions/setup-vp-env@v1`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
-  - `Florencea/vp-actions/actions/setup-playwright@v1`: Playwright browser cache, Chromium binary installation, and Linux system dependencies.
+- **Electron & Specialized Composite Actions**: Electron desktop projects consume `Florencea/vp-actions/.github/workflows/vp-electron-ci.yml@v3.0.0`; workflows with custom deployment or execution requirements consume modular composite actions:
+  - `Florencea/vp-actions/actions/setup-vp-env@v3.0.0`: Node.js engine, Vite+, dependency installation, and Vite Task Cache.
+  - `Florencea/vp-actions/actions/setup-playwright@v3.0.0`: Chromium binary installation and Linux system dependencies.
 
-## 3. Action Versioning SSOT (Major Versions Only)
+## 3. Action Versioning SSOT (Exact SemVer Pinning)
 
-- **Unpinned Major Floating Tags**: All GitHub Actions and reusable workflows must track the latest major version tag (e.g. `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v1`, `voidzero-dev/setup-vp@v1`, `actions/checkout@v7`, `actions/cache@v6`, `actions/upload-artifact@v7`, `actions/configure-pages@v6`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5`).
-- **Strict Prohibition on Patch/Minor Pinning**: Never pin Actions to minor or patch versions (e.g. `@v1.21.2` or `@v7.0.1`). Major version tags ensure automated security patches and non-breaking bug fixes without manual intervention.
+- **Exact SemVer Pinning**: Pin GitHub Actions and reusable workflows to exact stable SemVer tags (`vX.Y.Z`) and upgrade via `up` (e.g. `Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0`, `voidzero-dev/setup-vp@v1.22.0`, `actions/checkout@v7.0.1`, `actions/cache@v6.1.0`, `actions/upload-artifact@v7.0.2`).
+- **Strict Prohibition on Floating Tags**: Avoid unpinned floating major or minor tags (e.g. `@v1` or `@v7.0`).
 
 ## 4. Runner Best Practices & Concurrency
 
