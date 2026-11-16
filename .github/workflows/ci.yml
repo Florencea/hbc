@@ -21,4 +21,4 @@ concurrency:
 jobs:
   ci:
     name: Gatekeeper
-    uses: Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.0.0
+    uses: Florencea/vp-actions/.github/workflows/vp-web-ci.yml@v3.1.0
