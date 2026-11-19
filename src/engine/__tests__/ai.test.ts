@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import { getPositionalWeight, selectBestMove } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { MapPreset } from "../types.ts";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
   describe("Positional Weight Matrix", () => {
@@ -65,7 +70,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
         mapPreset: "CROSSROADS",
         boardSize: 16,
       });
-      const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
+      const activePlayer = state.players.find(
+        (p) => p.id === state.activePlayerId,
+      );
       expect(activePlayer).toBeDefined();
       if (!activePlayer) return;
 
@@ -86,7 +93,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       const placeAction1 = action.type === "PLACE_PIECE" ? action : null;
       expect(placeAction1?.skillType).not.toBe("NONE");
       expect(placeAction1?.skillType).toBe("WALL");
-      expect(activePlayer.hand[placeAction1?.skillType ?? "NONE"]).toBeGreaterThan(0);
+      expect(
+        activePlayer.hand[placeAction1?.skillType ?? "NONE"],
+      ).toBeGreaterThan(0);
 
       // Must be a valid dispatch without throwing IllegalMoveError
       const res = dispatch(state, action);
@@ -298,7 +307,9 @@ describe("Heuristic AI Engine (src/engine/ai.ts)", () => {
       let totalMoves = 0;
 
       for (let turn = 0; turn < 40 && !state.isGameOver; turn++) {
-        const activePlayer = state.players.find((p) => p.id === state.activePlayerId);
+        const activePlayer = state.players.find(
+          (p) => p.id === state.activePlayerId,
+        );
         const wasForced = activePlayer?.isForcedSpecial ?? false;
         const action = selectBestMove(state, state.activePlayerId, "MEDIUM");
         if (action.type === "PLACE_PIECE") {

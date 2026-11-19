@@ -10,7 +10,8 @@ import {
   playGameOverSound,
 } from "./sound.ts";
 
-export type CombatTextVariant = "blocked" | "counter" | "bomb" | "purify" | "pierce";
+export type CombatTextVariant =
+  "blocked" | "counter" | "bomb" | "purify" | "pierce";
 
 export interface EventHandlers {
   onPiecePlaced?: (coord: Coord, piece: Piece) => void;
@@ -18,21 +19,42 @@ export interface EventHandlers {
   onRaycastBlocked?: (wallCoord: Coord) => void;
   onPierceTriggered?: (coord: Coord) => void;
   onPieceFlip?: (coord: Coord, toTeamId: number) => void;
-  onCounterTriggered?: (center: Coord, reversedCoords: Coord[], defenderTeamId: number) => void;
-  onBombTriggered?: (center: Coord, blastCoords: Coord[], teamId: number) => void;
-  onPurifyPulse?: (center: Coord, affectedCoords: Coord[], teamId: number) => void;
-  onPieceRevealed?: (coord: Coord, skillType: SkillType, reason: string) => void;
-  onAddFloatingText?: (text: string, coord: Coord, variant: CombatTextVariant) => void;
+  onCounterTriggered?: (
+    center: Coord,
+    reversedCoords: Coord[],
+    defenderTeamId: number,
+  ) => void;
+  onBombTriggered?: (
+    center: Coord,
+    blastCoords: Coord[],
+    teamId: number,
+  ) => void;
+  onPurifyPulse?: (
+    center: Coord,
+    affectedCoords: Coord[],
+    teamId: number,
+  ) => void;
+  onPieceRevealed?: (
+    coord: Coord,
+    skillType: SkillType,
+    reason: string,
+  ) => void;
+  onAddFloatingText?: (
+    text: string,
+    coord: Coord,
+    variant: CombatTextVariant,
+  ) => void;
   onTriggerScreenShake?: (durationMs?: number) => void;
   onTriggerScreenFlash?: (color: string, durationMs?: number) => void;
   onGameOver?: (winnerTeamId: number | null) => void;
   delayFn?: (ms: number) => Promise<void>;
 }
 
-const defaultDelay = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
+const defaultDelay = async (ms: number): Promise<void> => {
+  await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
+};
 
 async function playEventStep(
   event: GameEvent,
@@ -67,7 +89,11 @@ async function playEventStep(
       handlers.onPieceRevealed?.(event.coord, event.skillType, event.reason);
       if (event.skillType === "PIERCE") {
         handlers.onPierceTriggered?.(event.coord);
-        handlers.onAddFloatingText?.("天空守望者 貫穿！", event.coord, "pierce");
+        handlers.onAddFloatingText?.(
+          "天空守望者 貫穿！",
+          event.coord,
+          "pierce",
+        );
         playPierceSound();
         await delay(450);
       }
@@ -93,7 +119,11 @@ async function playEventStep(
       handlers.onTriggerScreenFlash?.("purple", 350);
       await delay(180); // Hitstop
 
-      handlers.onCounterTriggered?.(event.coord, event.reversedCoords, event.defenderTeamId);
+      handlers.onCounterTriggered?.(
+        event.coord,
+        event.reversedCoords,
+        event.defenderTeamId,
+      );
       handlers.onAddFloatingText?.("深淵復仇者 反擊！", event.coord, "counter");
       playCounterSound();
       await delay(520);
@@ -124,7 +154,11 @@ async function playEventStep(
       break;
     }
 
-    default:
+    case "TURN_CHANGED":
+    case "SKILL_ACQUIRED":
+    case "FORCED_SPECIAL_TRIGGERED":
+    case "DROP_PHASE_STARTED":
+    case "DROP_PHASE_ENDED":
       break;
   }
 }
@@ -133,7 +167,10 @@ async function playEventStep(
  * Executes a sequence of game events with choreographed animation delays,
  * visual callbacks, and synchronized audio playback.
  */
-export async function playEvents(events: GameEvent[], handlers: EventHandlers): Promise<void> {
+export async function playEvents(
+  events: GameEvent[],
+  handlers: EventHandlers,
+): Promise<void> {
   const delay = handlers.delayFn ?? defaultDelay;
 
   const playNext = async (index: number): Promise<void> => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it, vi } from "vitest";
 import type { GameEvent } from "../../engine/types.ts";
 import { playEvents, type EventHandlers } from "../choreography.ts";
 
@@ -9,19 +9,25 @@ describe("event choreography", () => {
 
     const handlers: EventHandlers = {
       onPiecePlaced: (coord, piece) => {
-        callLog.push(`place:${coord.x.toString()},${coord.y.toString()}:${piece.skillType}`);
+        callLog.push(
+          `place:${coord.x.toString()},${coord.y.toString()}:${piece.skillType}`,
+        );
       },
       onPioneerPlaced: (coord) => {
         callLog.push(`pioneer:${coord.x.toString()},${coord.y.toString()}`);
       },
       onRaycastBlocked: (wallCoord) => {
-        callLog.push(`blocked:${wallCoord.x.toString()},${wallCoord.y.toString()}`);
+        callLog.push(
+          `blocked:${wallCoord.x.toString()},${wallCoord.y.toString()}`,
+        );
       },
       onPierceTriggered: (coord) => {
         callLog.push(`pierce:${coord.x.toString()},${coord.y.toString()}`);
       },
       onPieceFlip: (coord, toTeamId) => {
-        callLog.push(`flip:${coord.x.toString()},${coord.y.toString()}:${toTeamId.toString()}`);
+        callLog.push(
+          `flip:${coord.x.toString()},${coord.y.toString()}:${toTeamId.toString()}`,
+        );
       },
       onCounterTriggered: (center, reversedCoords, defenderTeamId) => {
         callLog.push(
@@ -39,10 +45,14 @@ describe("event choreography", () => {
         );
       },
       onPieceRevealed: (coord, skillType, reason) => {
-        callLog.push(`reveal:${coord.x.toString()},${coord.y.toString()}:${skillType}:${reason}`);
+        callLog.push(
+          `reveal:${coord.x.toString()},${coord.y.toString()}:${skillType}:${reason}`,
+        );
       },
       onAddFloatingText: (text, coord, variant) => {
-        callLog.push(`text:${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`);
+        callLog.push(
+          `text:${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`,
+        );
       },
       onTriggerScreenShake: (durationMs) => {
         callLog.push(`shake:${(durationMs ?? 0).toString()}`);
@@ -50,9 +60,9 @@ describe("event choreography", () => {
       onTriggerScreenFlash: (color, durationMs) => {
         callLog.push(`flash:${color}:${(durationMs ?? 0).toString()}`);
       },
-      delayFn: (ms: number) => {
+      delayFn: async (ms: number) => {
         delays.push(ms);
-        return Promise.resolve();
+        await Promise.resolve();
       },
     };
 
@@ -185,14 +195,16 @@ describe("event choreography", () => {
       ],
       {
         onAddFloatingText: (text, coord, variant) => {
-          texts.push(`${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`);
+          texts.push(
+            `${text}:${coord.x.toString()},${coord.y.toString()}:${variant}`,
+          );
         },
         onPierceTriggered: (coord) => {
           pierceCoords.push(`${coord.x.toString()},${coord.y.toString()}`);
         },
-        delayFn: (ms) => {
+        delayFn: async (ms) => {
           delays.push(ms);
-          return Promise.resolve();
+          await Promise.resolve();
         },
       },
     );

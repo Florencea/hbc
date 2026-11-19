@@ -84,12 +84,24 @@ export function BoardOverlay({
       {pioneerBridges.length > 0 && (
         <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
           <defs>
-            <linearGradient id="bridge-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient
+              id="bridge-glow"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
               <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
               <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.9" />
             </linearGradient>
-            <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+            <filter
+              id="glow-filter"
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
               <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
@@ -132,7 +144,10 @@ export function BoardOverlay({
           <div key={vortex.id} className="absolute inset-0">
             {/* SVG Lightning Rays Tracing Along Reversed Coordinates */}
             {vortex.reversedCoords.length > 0 && (
-              <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
+              <svg
+                className="absolute inset-0 h-full w-full"
+                aria-hidden="true"
+              >
                 <defs>
                   <filter
                     id={`void-glow-${vortex.id}`}
@@ -152,7 +167,9 @@ export function BoardOverlay({
                   const x2 = ((rc.x + 0.5) / boardSize) * 100;
                   const y2 = ((rc.y + 0.5) / boardSize) * 100;
                   return (
-                    <g key={`${rc.x.toString()}-${rc.y.toString()}-${idx.toString()}`}>
+                    <g
+                      key={`${rc.x.toString()}-${rc.y.toString()}-${idx.toString()}`}
+                    >
                       <line
                         x1={`${centerX.toString()}%`}
                         y1={`${centerY.toString()}%`}
@@ -181,7 +198,7 @@ export function BoardOverlay({
 
             {/* Central Abyssal Singularity Dark Core */}
             <div
-              className="animate-abyss-singularity absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+              className="absolute flex -translate-x-1/2 -translate-y-1/2 animate-abyss-singularity items-center justify-center"
               style={{
                 left: `${centerX.toString()}%`,
                 top: `${centerY.toString()}%`,
@@ -221,11 +238,17 @@ export function BoardOverlay({
             {/* Hexagonal Shield Vector */}
             <svg
               viewBox="0 0 100 100"
-              className="animate-hex-shield h-full w-full"
+              className="h-full w-full animate-hex-shield"
               aria-hidden="true"
             >
               <defs>
-                <linearGradient id={`hex-grad-${ripple.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient
+                  id={`hex-grad-${ripple.id}`}
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
                   <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.95" />
                   <stop offset="50%" stopColor="#10b981" stopOpacity="0.75" />
                   <stop offset="100%" stopColor="#047857" stopOpacity="0.85" />
@@ -270,7 +293,7 @@ export function BoardOverlay({
             </svg>
 
             {/* Spark Deflection Wave */}
-            <div className="animate-shield-spark absolute inset-1 rounded-full border-2 border-emerald-300/80 bg-emerald-400/20" />
+            <div className="absolute inset-1 animate-shield-spark rounded-full border-2 border-emerald-300/80 bg-emerald-400/20" />
           </div>
         );
       })}
@@ -294,16 +317,22 @@ export function BoardOverlay({
             }}
           >
             {/* Sonic Boom Rings */}
-            <div className="animate-pierce-ring absolute h-full w-full rounded-full border-2 border-cyan-300/90 bg-cyan-400/20 shadow-[0_0_20px_rgba(56,189,248,0.9)]" />
+            <div className="absolute h-full w-full animate-pierce-ring rounded-full border-2 border-cyan-300/90 bg-cyan-400/20 shadow-[0_0_20px_rgba(56,189,248,0.9)]" />
 
             {/* Supersonic Astral Diamond Lance SVG */}
             <svg
               viewBox="0 0 100 100"
-              className="animate-pierce-lance h-4/5 w-4/5"
+              className="h-4/5 w-4/5 animate-pierce-lance"
               aria-hidden="true"
             >
               <defs>
-                <linearGradient id={`lance-grad-${pierce.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient
+                  id={`lance-grad-${pierce.id}`}
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
                   <stop offset="0%" stopColor="#ffffff" />
                   <stop offset="50%" stopColor="#38bdf8" />
                   <stop offset="100%" stopColor="#0284c7" />
@@ -342,12 +371,12 @@ export function BoardOverlay({
             }}
           >
             {/* Outer 3x3 Fiery Blast Wave */}
-            <div className="animate-bomb-shock absolute inset-0 rounded-full border-4 border-rose-500/90 bg-radial-[circle_at_center] from-rose-500/80 via-orange-500/40 to-transparent shadow-[0_0_40px_rgba(244,63,94,0.95)]" />
+            <div className="absolute inset-0 animate-bomb-shock rounded-full border-4 border-rose-500/90 bg-radial-[circle_at_center] from-rose-500/80 via-orange-500/40 to-transparent shadow-[0_0_40px_rgba(244,63,94,0.95)]" />
 
             {/* Jagged Explosion Ring Texture */}
             <svg
               viewBox="0 0 120 120"
-              className="animate-blast-wave absolute h-full w-full"
+              className="absolute h-full w-full animate-blast-wave"
               aria-hidden="true"
             >
               <circle
@@ -363,13 +392,13 @@ export function BoardOverlay({
             </svg>
 
             {/* Incandescent Core Flash */}
-            <div className="animate-bomb-core absolute h-1/3 w-1/3 rounded-full bg-linear-to-tr from-white via-yellow-200 to-rose-400 shadow-[0_0_30px_rgba(255,255,255,1)]" />
+            <div className="absolute h-1/3 w-1/3 animate-bomb-core rounded-full bg-linear-to-tr from-white via-yellow-200 to-rose-400 shadow-[0_0_30px_rgba(255,255,255,1)]" />
 
             {/* Flying Fiery Ember Particles */}
             {EMBER_DIRECTIONS.map((dir) => (
               <div
                 key={`${dir.dx.toString()}_${dir.dy.toString()}`}
-                className="animate-shield-spark absolute h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,1)]"
+                className="absolute h-2 w-2 animate-shield-spark rounded-full bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,1)]"
                 style={{
                   transform: `translate(${dir.dx.toString()}px, ${dir.dy.toString()}px)`,
                 }}
@@ -398,16 +427,22 @@ export function BoardOverlay({
             }}
           >
             {/* Outer Gentle Celestial Aura Ripple */}
-            <div className="animate-aura-pulse absolute inset-0 rounded-full border-2 border-amber-300/95 bg-radial-[circle_at_center] from-amber-400/55 via-amber-500/25 to-transparent shadow-[0_0_35px_rgba(251,191,36,0.85)]" />
+            <div className="absolute inset-0 animate-aura-pulse rounded-full border-2 border-amber-300/95 bg-radial-[circle_at_center] from-amber-400/55 via-amber-500/25 to-transparent shadow-[0_0_35px_rgba(251,191,36,0.85)]" />
 
             {/* Sacred 12-Fold Sunburst Mandala SVG */}
             <svg
               viewBox="0 0 100 100"
-              className="animate-purify-mandala absolute h-4/5 w-4/5"
+              className="absolute h-4/5 w-4/5 animate-purify-mandala"
               aria-hidden="true"
             >
               <defs>
-                <linearGradient id={`purify-grad-${aura.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient
+                  id={`purify-grad-${aura.id}`}
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
                   <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
                   <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.75" />
                   <stop offset="100%" stopColor="#d97706" stopOpacity="0.6" />
@@ -466,7 +501,7 @@ export function BoardOverlay({
             {STARDUST_OFFSETS.map((pt) => (
               <div
                 key={`${pt.x.toString()}_${pt.y.toString()}`}
-                className="animate-purify-sparkle absolute h-2 w-2 rounded-full bg-amber-200 shadow-[0_0_8px_rgba(254,240,138,1)]"
+                className="absolute h-2 w-2 animate-purify-sparkle rounded-full bg-amber-200 shadow-[0_0_8px_rgba(254,240,138,1)]"
                 style={{
                   transform: `translate(${pt.x.toString()}px, ${pt.y.toString()}px)`,
                   animationDelay: pt.delay,

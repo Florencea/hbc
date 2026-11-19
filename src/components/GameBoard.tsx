@@ -1,5 +1,11 @@
 import { isWithinDropZone } from "../engine/map.ts";
-import type { Coord, DropZone, GameState, MaskedPiece, Piece } from "../engine/types.ts";
+import type {
+  Coord,
+  DropZone,
+  GameState,
+  MaskedPiece,
+  Piece,
+} from "../engine/types.ts";
 import { cn } from "../lib/cn.ts";
 import {
   BoardOverlay,
@@ -10,7 +16,10 @@ import {
   type PioneerBridgeEffect,
   type ShieldRippleEffect,
 } from "./BoardOverlay.tsx";
-import { FloatingCombatText, type CombatTextItem } from "./FloatingCombatText.tsx";
+import {
+  FloatingCombatText,
+  type CombatTextItem,
+} from "./FloatingCombatText.tsx";
 import {
   getLegalMarkerClass,
   getSpecialPieceGlowClass,
@@ -117,7 +126,8 @@ export function GameBoard({
               const isHovered = hoveredCoord?.x === x && hoveredCoord.y === y;
               const isPreviewPlacement =
                 !isAnimating && piece === null && isHovered && isStandardLegal;
-              const isPreviewFlipped = !isAnimating && previewCapturedSet.has(key);
+              const isPreviewFlipped =
+                !isAnimating && previewCapturedSet.has(key);
 
               return (
                 <button
@@ -145,7 +155,9 @@ export function GameBoard({
                   }
                   className={cn(
                     "relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8",
-                    (x + y) % 2 === 0 ? "bg-emerald-900/90" : "bg-emerald-800/80",
+                    (x + y) % 2 === 0
+                      ? "bg-emerald-900/90"
+                      : "bg-emerald-800/80",
                     gameState.isDropPhase &&
                       inDropZone &&
                       ((gameMode === "PVE" ? 1 : activePlayerTeamId) === 1
@@ -162,11 +174,21 @@ export function GameBoard({
                   )}
                 >
                   {/* Legal Move Marker matching active team color (hidden during preview ghost piece) */}
-                  {piece === null && !isAnimating && isStandardLegal && !isPreviewPlacement && (
-                    <span className={getLegalMarkerClass(activePlayerTeamId, false)} />
-                  )}
+                  {piece === null &&
+                    !isAnimating &&
+                    isStandardLegal &&
+                    !isPreviewPlacement && (
+                      <span
+                        className={getLegalMarkerClass(
+                          activePlayerTeamId,
+                          false,
+                        )}
+                      />
+                    )}
                   {piece === null && !isAnimating && isPioneerLegal && (
-                    <span className={getLegalMarkerClass(activePlayerTeamId, true)} />
+                    <span
+                      className={getLegalMarkerClass(activePlayerTeamId, true)}
+                    />
                   )}
 
                   {/* Hover Preview Ghost Piece */}
@@ -179,7 +201,9 @@ export function GameBoard({
                           : "border-zinc-200/80 bg-white/70 text-zinc-900 ring-2 ring-white/70",
                       )}
                     >
-                      <span className="text-[9px] font-black opacity-90 sm:text-[10px]">+</span>
+                      <span className="text-[9px] font-black opacity-90 sm:text-[10px]">
+                        +
+                      </span>
                     </div>
                   )}
 

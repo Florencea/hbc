@@ -46,16 +46,29 @@ function formatEventSummary(step: MatchStepRecord): string[] {
         }
         break;
       case "BOMB_TRIGGERED":
-        summaries.push(`殺戮盛宴 引爆！（波及 ${ev.blastCoords.length.toString()} 顆）`);
+        summaries.push(
+          `殺戮盛宴 引爆！（波及 ${ev.blastCoords.length.toString()} 顆）`,
+        );
         break;
       case "COUNTER_TRIGGERED":
-        summaries.push(`深淵復仇者 反擊！（逆轉 ${ev.reversedCoords.length.toString()} 顆）`);
+        summaries.push(
+          `深淵復仇者 反擊！（逆轉 ${ev.reversedCoords.length.toString()} 顆）`,
+        );
         break;
       case "PURIFY_PULSE":
-        summaries.push(`救贖之光 淨化！（感化 ${ev.affectedCoords.length.toString()} 顆）`);
+        summaries.push(
+          `救贖之光 淨化！（感化 ${ev.affectedCoords.length.toString()} 顆）`,
+        );
         break;
       case "GAME_OVER":
         summaries.push("對局分出勝負（遊戲結束）");
+        break;
+      case "PIECE_PLACED":
+      case "TURN_CHANGED":
+      case "SKILL_ACQUIRED":
+      case "FORCED_SPECIAL_TRIGGERED":
+      case "DROP_PHASE_STARTED":
+      case "DROP_PHASE_ENDED":
         break;
     }
   }
@@ -187,7 +200,9 @@ export function ReplayControls({
         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
           <span>開局初始 (0)</span>
           <span className="font-mono text-indigo-300">
-            {replayIndex === -1 ? "初始盤面" : `落子第 ${(replayIndex + 1).toString()} 手`}
+            {replayIndex === -1
+              ? "初始盤面"
+              : `落子第 ${(replayIndex + 1).toString()} 手`}
           </span>
           <span>終局 (第 {totalSteps.toString()} 手)</span>
         </div>
@@ -286,7 +301,9 @@ export function ReplayControls({
         {/* Current Move Notation Badge */}
         {currentStep && (
           <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
-            <span className="font-mono font-semibold text-slate-400">{currentStep.notation}</span>
+            <span className="font-mono font-semibold text-slate-400">
+              {currentStep.notation}
+            </span>
           </div>
         )}
       </div>
@@ -311,7 +328,8 @@ export function ReplayControls({
                 <span className="text-slate-300">落子於</span>
                 <span className="font-mono font-black text-amber-300">
                   {coordToAlgebraic(currentStep.action.coord)} (
-                  {currentStep.action.coord.x.toString()}, {currentStep.action.coord.y.toString()})
+                  {currentStep.action.coord.x.toString()},{" "}
+                  {currentStep.action.coord.y.toString()})
                 </span>
                 <span className="text-slate-300">部署棋子：</span>
                 <span

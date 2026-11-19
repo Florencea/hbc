@@ -1,4 +1,4 @@
-import { afterEach } from "vite-plus/test";
+import { afterEach } from "vitest";
 import { cleanupApp } from "./test-utils.tsx";
 
 afterEach(async () => {

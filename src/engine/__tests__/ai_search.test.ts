@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import {
   calculateRiskScore,
   evaluateBoardState,
@@ -8,7 +8,12 @@ import {
   selectBestMoveMinimax,
 } from "../ai.ts";
 import { createInitialGame, dispatch } from "../pipeline.ts";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
   it("minimax_blocks_opponent_corner_capture: HARD AI looks ahead 2 plies and avoids moves that hand the opponent an immediate corner capture", () => {
@@ -83,7 +88,14 @@ describe("AI Search & Trap Risk Modeling (src/engine/ai.ts)", () => {
     const counterReady = isOpponentCounterReady(state, 1);
     expect(counterReady).toBe(true);
 
-    const riskNone = calculateRiskScore(state.board, state.size, { x: 1, y: 5 }, 1, "NONE", true);
+    const riskNone = calculateRiskScore(
+      state.board,
+      state.size,
+      { x: 1, y: 5 },
+      1,
+      "NONE",
+      true,
+    );
     const riskPierce = calculateRiskScore(
       state.board,
       state.size,

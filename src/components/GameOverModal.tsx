@@ -76,9 +76,13 @@ export function GameOverModal({
           >
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-3.5 w-3.5 rounded-full border border-zinc-500 bg-zinc-950 shadow-xs ring-1 ring-zinc-700/60" />
-              <span className="text-xs font-bold text-slate-300">第一隊（黑方）</span>
+              <span className="text-xs font-bold text-slate-300">
+                第一隊（黑方）
+              </span>
             </div>
-            <div className="mt-2 text-3xl font-black text-white">{team1Count.toString()}</div>
+            <div className="mt-2 text-3xl font-black text-white">
+              {team1Count.toString()}
+            </div>
             <span className="mt-1 text-[10px] text-slate-400">枚棋子</span>
             {winnerTeamId === 1 && (
               <span className="mt-2 rounded-full border border-amber-400/80 bg-amber-400/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
@@ -98,9 +102,13 @@ export function GameOverModal({
           >
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 bg-white shadow-xs ring-1 ring-slate-200/80" />
-              <span className="text-xs font-bold text-slate-300">第二隊（白方）</span>
+              <span className="text-xs font-bold text-slate-300">
+                第二隊（白方）
+              </span>
             </div>
-            <div className="mt-2 text-3xl font-black text-white">{team2Count.toString()}</div>
+            <div className="mt-2 text-3xl font-black text-white">
+              {team2Count.toString()}
+            </div>
             <span className="mt-1 text-[10px] text-slate-400">枚棋子</span>
             {winnerTeamId === 2 && (
               <span className="mt-2 rounded-full border border-amber-400/80 bg-amber-400/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300">
@@ -134,7 +142,9 @@ export function GameOverModal({
           </div>
           <div className="flex justify-between py-1">
             <span>中立錨點存留</span>
-            <span className="font-mono font-bold text-amber-300">{neutralCount.toString()} 顆</span>
+            <span className="font-mono font-bold text-amber-300">
+              {neutralCount.toString()} 顆
+            </span>
           </div>
         </div>
 

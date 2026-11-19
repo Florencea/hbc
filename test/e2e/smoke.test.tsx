@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vitest";
 import { renderApp } from "../test-utils.tsx";
 import "../../src/global.css";
 
@@ -31,7 +31,7 @@ describe("HBC Game Smoke Test in Browser Mode", () => {
     const replayBtn = screen.getByRole("button", { name: /🎬 對局回放/ });
     await expect
       .poll(
-        async () => {
+        () => {
           const el = replayBtn.element();
           return el instanceof HTMLButtonElement && !el.disabled;
         },
@@ -48,7 +48,9 @@ describe("HBC Game Smoke Test in Browser Mode", () => {
     // Verify export modal can be opened from replay bar
     const exportBtn = screen.getByRole("button", { name: "📥 匯出棋譜" });
     await exportBtn.click();
-    const exportTitle = screen.getByText("匯出對局棋譜 (Export Match Notation)");
+    const exportTitle = screen.getByText(
+      "匯出對局棋譜 (Export Match Notation)",
+    );
     await expect.element(exportTitle).toBeVisible();
 
     // Close export modal

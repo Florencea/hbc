@@ -56,7 +56,9 @@ export interface ReplaySession {
   getTotalSteps(): number;
   getCurrentStep(): MatchStepRecord | null;
   getCurrentState(): GameState;
-  getCurrentMaskedState(viewerPlayerId?: number | null): MaskedGameState | GameState;
+  getCurrentMaskedState(
+    viewerPlayerId?: number | null,
+  ): MaskedGameState | GameState;
   canStepForward(): boolean;
   canStepBackward(): boolean;
   stepForward(): { state: GameState; step: MatchStepRecord } | null;
@@ -70,7 +72,11 @@ export interface ReplaySession {
  * Live tracker for building match history as actions are dispatched.
  */
 export interface MatchTracker {
-  recordStep(action: Action, nextState: GameState, events: GameEvent[]): MatchStepRecord;
+  recordStep(
+    action: Action,
+    nextState: GameState,
+    events: GameEvent[],
+  ): MatchStepRecord;
   getHistory(): MatchHistory;
   reset(initialState: GameState, matchId?: string): void;
 }
@@ -91,7 +97,12 @@ export function coordToAlgebraic(coord: Coord): string {
 export function algebraicToCoord(algebraic: string): Coord {
   const trimmed = algebraic.trim().toUpperCase();
   const match = /^([A-P])([1-9]|1[0-6])$/.exec(trimmed);
-  if (!match?.[1] || !match[2]) {
+  if (
+    match?.[1] === undefined ||
+    match[1] === "" ||
+    match[2] === undefined ||
+    match[2] === ""
+  ) {
     throw new Error(`Invalid algebraic coordinate: "${algebraic}"`);
   }
   const col = match[1].charCodeAt(0) - 65;
@@ -108,7 +119,7 @@ export function formatActionNotation(
   events: GameEvent[],
   moveNumber?: number,
 ): string {
-  const prefix = moveNumber != null ? `${moveNumber.toString()}. ` : "";
+  const prefix = moveNumber !== undefined ? `${moveNumber.toString()}. ` : "";
 
   if (action.type === "PASS_TURN") {
     return `${prefix}P${action.playerId.toString()}:PASS`;
@@ -157,21 +168,36 @@ export function formatActionNotation(
       case "PIONEER_PLACED":
         isPioneer = true;
         break;
+      case "PIECE_PLACED":
+      case "TURN_CHANGED":
+      case "SKILL_ACQUIRED":
+      case "FORCED_SPECIAL_TRIGGERED":
+      case "GAME_OVER":
+      case "DROP_PHASE_STARTED":
+      case "DROP_PHASE_ENDED":
+        break;
     }
   }
 
   if (isPioneer) annotations.push("pioneer:1");
   if (totalFlips > 0) annotations.push(`flips:${totalFlips.toString()}`);
   if (wallBlocks > 0) annotations.push(`block:${wallBlocks.toString()}`);
-  if (penetrations > 0) annotations.push(`penetrate:${penetrations.toString()}`);
+  if (penetrations > 0)
+    annotations.push(`penetrate:${penetrations.toString()}`);
   if (bombDetonations > 0) {
-    annotations.push(`bomb:${bombDetonations.toString()}(${bombAffected.toString()})`);
+    annotations.push(
+      `bomb:${bombDetonations.toString()}(${bombAffected.toString()})`,
+    );
   }
   if (counterTriggers > 0) {
-    annotations.push(`counter:${counterTriggers.toString()}(${counterReversed.toString()})`);
+    annotations.push(
+      `counter:${counterTriggers.toString()}(${counterReversed.toString()})`,
+    );
   }
   if (purifyPulses > 0) {
-    annotations.push(`purify:${purifyPulses.toString()}(${purifyAffected.toString()})`);
+    annotations.push(
+      `purify:${purifyPulses.toString()}(${purifyAffected.toString()})`,
+    );
   }
 
   if (annotations.length > 0) {
@@ -234,9 +260,13 @@ const MatchStepRecordSchema = z.object({
   stepIndex: z.number(),
   turnNumber: z.number(),
   playerId: z.number(),
-  action: z.custom<Action>((val) => typeof val === "object" && val !== null && "type" in val),
+  action: z.custom<Action>(
+    (val) => typeof val === "object" && val !== null && "type" in val,
+  ),
   events: z.array(
-    z.custom<GameEvent>((val) => typeof val === "object" && val !== null && "type" in val),
+    z.custom<GameEvent>(
+      (val) => typeof val === "object" && val !== null && "type" in val,
+    ),
   ),
   notation: z.string(),
   stateSnapshot: z.custom<GameState>(
@@ -329,8 +359,14 @@ export function parseHbcPgn(pgnString: string): ParsedHbcPgn {
     const trimmed = line.trim();
     if (inHeaders) {
       if (trimmed.startsWith("[")) {
-        const headerMatch = /^\s*\[([A-Za-z0-9_]+)\s+"([^"]*)"\]\s*$/.exec(trimmed);
-        if (headerMatch?.[1] && headerMatch[2] !== undefined) {
+        const headerMatch = /^\s*\[([A-Za-z0-9_]+)\s+"([^"]*)"\]\s*$/.exec(
+          trimmed,
+        );
+        if (
+          headerMatch?.[1] !== undefined &&
+          headerMatch[1] !== "" &&
+          headerMatch[2] !== undefined
+        ) {
           headers[headerMatch[1]] = headerMatch[2];
         }
       } else if (trimmed === "") {
@@ -357,7 +393,10 @@ export function parseHbcPgn(pgnString: string): ParsedHbcPgn {
   }
 
   const boardSizeRaw = headers.BoardSize;
-  const boardSize = boardSizeRaw ? parseInt(boardSizeRaw, 10) : 16;
+  const boardSize =
+    boardSizeRaw !== undefined && boardSizeRaw !== ""
+      ? parseInt(boardSizeRaw, 10)
+      : 16;
 
   // Regex to match:
   // e.g. "1. P1:H8[NONE] {flips:2}" or "P1:H8[WALL]" or "P2:PASS"
@@ -377,7 +416,7 @@ export function parseHbcPgn(pgnString: string): ParsedHbcPgn {
         type: "PASS_TURN",
         playerId,
       });
-    } else if (target) {
+    } else if (target !== undefined && target !== "") {
       const coord = algebraicToCoord(target);
       const skillType: SkillType =
         skillRaw === "WALL" ||
@@ -470,7 +509,10 @@ export function replayMatchActions(
 /**
  * Creates a ReplaySession controller for stepping through recorded matches.
  */
-export function createReplaySession(history: MatchHistory, initialIndex?: number): ReplaySession {
+export function createReplaySession(
+  history: MatchHistory,
+  initialIndex?: number,
+): ReplaySession {
   const totalSteps = history.steps.length;
   let currentIndex =
     initialIndex !== undefined
@@ -505,9 +547,11 @@ export function createReplaySession(history: MatchHistory, initialIndex?: number
       return step ? step.stateSnapshot : history.initialState;
     },
 
-    getCurrentMaskedState(viewerPlayerId?: number | null): MaskedGameState | GameState {
+    getCurrentMaskedState(
+      viewerPlayerId?: number | null,
+    ): MaskedGameState | GameState {
       const state = this.getCurrentState();
-      if (viewerPlayerId == null) {
+      if (viewerPlayerId === undefined || viewerPlayerId === null) {
         return state;
       }
       return sanitizeForViewer(state, viewerPlayerId);
@@ -574,7 +618,10 @@ export function createReplaySession(history: MatchHistory, initialIndex?: number
 /**
  * Creates a MatchTracker instance for recording live moves as they occur.
  */
-export function createMatchTracker(initialState: GameState, matchId?: string): MatchTracker {
+export function createMatchTracker(
+  initialState: GameState,
+  matchId?: string,
+): MatchTracker {
   let history: MatchHistory = {
     metadata: {
       id: matchId ?? `match-${Date.now().toString()}`,
@@ -595,7 +642,11 @@ export function createMatchTracker(initialState: GameState, matchId?: string): M
   };
 
   return {
-    recordStep(action: Action, nextState: GameState, events: GameEvent[]): MatchStepRecord {
+    recordStep(
+      action: Action,
+      nextState: GameState,
+      events: GameEvent[],
+    ): MatchStepRecord {
       const stepIndex = history.steps.length;
       const notation = formatActionNotation(action, events, stepIndex + 1);
       const stateSnapshot = cloneGameState(nextState);

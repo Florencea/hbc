@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import { createInitialGame, dispatch } from "../pipeline.ts";
 import {
   algebraicToCoord,
@@ -14,7 +14,12 @@ import {
   type MatchHistory,
 } from "../replay.ts";
 import { type Action, type GameEvent, type GameState } from "../types.ts";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 function buildTestHistory(): MatchHistory {
   const initial = createInitialGame({
@@ -52,10 +57,18 @@ describe("Phase 8: Match History & Visual Replay System (src/engine/replay.ts)",
     });
 
     it("throws descriptive error on invalid algebraic coordinates", () => {
-      expect(() => algebraicToCoord("Z1")).toThrow('Invalid algebraic coordinate: "Z1"');
-      expect(() => algebraicToCoord("A0")).toThrow('Invalid algebraic coordinate: "A0"');
-      expect(() => algebraicToCoord("A17")).toThrow('Invalid algebraic coordinate: "A17"');
-      expect(() => algebraicToCoord("")).toThrow('Invalid algebraic coordinate: ""');
+      expect(() => algebraicToCoord("Z1")).toThrow(
+        'Invalid algebraic coordinate: "Z1"',
+      );
+      expect(() => algebraicToCoord("A0")).toThrow(
+        'Invalid algebraic coordinate: "A0"',
+      );
+      expect(() => algebraicToCoord("A17")).toThrow(
+        'Invalid algebraic coordinate: "A17"',
+      );
+      expect(() => algebraicToCoord("")).toThrow(
+        'Invalid algebraic coordinate: ""',
+      );
     });
   });
 
@@ -186,7 +199,9 @@ describe("Phase 8: Match History & Visual Replay System (src/engine/replay.ts)",
 
       const restoredStep = restored.steps[0];
       expect(restoredStep?.action).toEqual(action);
-      expect(restoredStep?.stateSnapshot.currentTurn).toBe(nextState.currentTurn);
+      expect(restoredStep?.stateSnapshot.currentTurn).toBe(
+        nextState.currentTurn,
+      );
     });
 
     it("throws descriptive error when deserializing invalid JSON payload", () => {
@@ -276,7 +291,9 @@ describe("Phase 8: Match History & Visual Replay System (src/engine/replay.ts)",
       };
 
       const liveResult = dispatch(initial.state, action);
-      const { history, finalState } = replayMatchActions("CROSSROADS", 16, [action]);
+      const { history, finalState } = replayMatchActions("CROSSROADS", 16, [
+        action,
+      ]);
 
       expect(history.steps.length).toBe(1);
       expect(finalState.currentTurn).toBe(liveResult.nextState.currentTurn);

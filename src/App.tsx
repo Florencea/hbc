@@ -18,7 +18,10 @@ import { ReplayControls } from "./components/ReplayControls.tsx";
 import { ExportModal, ImportModal } from "./components/ReplayModals.tsx";
 import { BattlefieldStatusBar } from "./components/BattlefieldStatusBar.tsx";
 import { EventLogPanel } from "./components/EventLogPanel.tsx";
-import { formatErrorMessage, type GameMode } from "./components/gameUiConstants.ts";
+import {
+  formatErrorMessage,
+  type GameMode,
+} from "./components/gameUiConstants.ts";
 import {
   collectAllRaycasts,
   createInitialGame,
@@ -75,12 +78,16 @@ function getNextSelectedSkill(
   if (!isHumanTurn) {
     return "NONE";
   }
-  const incomingPlayer = nextState.players.find((p) => p.id === nextState.activePlayerId);
+  const incomingPlayer = nextState.players.find(
+    (p) => p.id === nextState.activePlayerId,
+  );
   if (!incomingPlayer) return "NONE";
 
   if (incomingPlayer.isForcedSpecial) {
     // Automatically pre-select the skill further down the list / highest CD / most powerful
-    const preferred = FORCED_SPECIAL_PRIORITY.find((sk) => incomingPlayer.hand[sk] > 0);
+    const preferred = FORCED_SPECIAL_PRIORITY.find(
+      (sk) => incomingPlayer.hand[sk] > 0,
+    );
     return preferred ?? "NONE";
   }
   if (currentSkill !== "NONE" && incomingPlayer.hand[currentSkill] <= 0) {
@@ -122,7 +129,10 @@ export default function App() {
   }, [toast]);
 
   const handleShowToast = useCallback(
-    (message: string, type: "error" | "info" | "warning" | "success" = "error") => {
+    (
+      message: string,
+      type: "error" | "info" | "warning" | "success" = "error",
+    ) => {
       setToast((prev) => ({
         key: (prev?.key ?? 0) + 1,
         message,
@@ -134,13 +144,18 @@ export default function App() {
 
   // Match history tracking and visual replay states
   const [matchTracker] = useState<MatchTracker>(() =>
-    createMatchTracker(createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).state),
+    createMatchTracker(
+      createInitialGame({ mapPreset: "CROSSROADS", boardSize: 16 }).state,
+    ),
   );
   const [recordedTurns, setRecordedTurns] = useState<number>(0);
   const [isReplayMode, setIsReplayMode] = useState<boolean>(false);
-  const [replaySession, setReplaySession] = useState<ReplaySession | null>(null);
+  const [replaySession, setReplaySession] = useState<ReplaySession | null>(
+    null,
+  );
   const [replayIndex, setReplayIndex] = useState<number>(-1);
-  const [isReplayAutoPlaying, setIsReplayAutoPlaying] = useState<boolean>(false);
+  const [isReplayAutoPlaying, setIsReplayAutoPlaying] =
+    useState<boolean>(false);
   const [replaySpeed, setReplaySpeed] = useState<"0.5x" | "1x" | "2x">("1x");
   const [replayViewerId, setReplayViewerId] = useState<number | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -148,9 +163,13 @@ export default function App() {
 
   // Animation and Visual FX states
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const [intermediateBoard, setIntermediateBoard] = useState<Board | null>(null);
+  const [intermediateBoard, setIntermediateBoard] = useState<Board | null>(
+    null,
+  );
   const intermediateBoardRef = useRef<Board | null>(null);
-  const [flippingCoords, setFlippingCoords] = useState<Set<string>>(() => new Set());
+  const [flippingCoords, setFlippingCoords] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [poppingCoord, setPoppingCoord] = useState<Coord | null>(null);
   const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
   const [screenFlash, setScreenFlash] = useState<string | null>(null);
@@ -160,19 +179,24 @@ export default function App() {
   const [shieldRipples, setShieldRipples] = useState<ShieldRippleEffect[]>([]);
   const [pierceStrikes, setPierceStrikes] = useState<PierceStrikeEffect[]>([]);
   const [abyssVortices, setAbyssVortices] = useState<AbyssVortexEffect[]>([]);
-  const [pioneerBridges, setPioneerBridges] = useState<PioneerBridgeEffect[]>([]);
+  const [pioneerBridges, setPioneerBridges] = useState<PioneerBridgeEffect[]>(
+    [],
+  );
 
   const activePlayer: Player | undefined = gameState.players.find(
     (p) => p.id === gameState.activePlayerId,
   );
 
   const isCurrentPlayerAi =
-    gameMode === "AI_VS_AI" || (gameMode === "PVE" && gameState.activePlayerId === 2);
+    gameMode === "AI_VS_AI" ||
+    (gameMode === "PVE" && gameState.activePlayerId === 2);
 
   const isPlayer1Ai = gameMode === "AI_VS_AI";
   const isPlayer2Ai = gameMode === "PVE" || gameMode === "AI_VS_AI";
 
-  const isHumanTurn = gameMode === "PVP" || (gameMode === "PVE" && gameState.activePlayerId === 1);
+  const isHumanTurn =
+    gameMode === "PVP" ||
+    (gameMode === "PVE" && gameState.activePlayerId === 1);
 
   // Pre-calculate AI move decision for current state so UI highlights and board previews match the AI's actual choice
   const aiAction: Action | null = (() => {
@@ -195,11 +219,13 @@ export default function App() {
       }
       return "NONE";
     }
-    if (activePlayer?.isForcedSpecial) {
+    if (activePlayer?.isForcedSpecial === true) {
       if (selectedSkill !== "NONE" && activePlayer.hand[selectedSkill] > 0) {
         return selectedSkill;
       }
-      const preferred = FORCED_SPECIAL_PRIORITY.find((sk) => activePlayer.hand[sk] > 0);
+      const preferred = FORCED_SPECIAL_PRIORITY.find(
+        (sk) => activePlayer.hand[sk] > 0,
+      );
       return preferred ?? "NONE";
     }
     return selectedSkill;
@@ -217,7 +243,9 @@ export default function App() {
   const viewerTeamId = gameMode === "PVE" ? 1 : (activePlayer?.teamId ?? 1);
 
   const replayState =
-    isReplayMode && replaySession ? replaySession.getCurrentMaskedState(replayViewerId) : null;
+    isReplayMode && replaySession
+      ? replaySession.getCurrentMaskedState(replayViewerId)
+      : null;
 
   const currentBoard: (Piece | MaskedPiece | null)[][] = replayState
     ? replayState.board
@@ -257,13 +285,21 @@ export default function App() {
   const availableMoves =
     isReplayMode || (gameMode === "PVE" && gameState.activePlayerId === 2)
       ? { standardMoves: [], pioneerMoves: [], isPioneerActive: false }
-      : getAvailableMoves(displayedState, gameState.activePlayerId, effectiveSkill);
+      : getAvailableMoves(
+          displayedState,
+          gameState.activePlayerId,
+          effectiveSkill,
+        );
 
   const standardMoveSet = new Set(
-    availableMoves.standardMoves.map((m) => `${m.x.toString()},${m.y.toString()}`),
+    availableMoves.standardMoves.map(
+      (m) => `${m.x.toString()},${m.y.toString()}`,
+    ),
   );
   const pioneerMoveSet = new Set(
-    availableMoves.pioneerMoves.map((m) => `${m.x.toString()},${m.y.toString()}`),
+    availableMoves.pioneerMoves.map(
+      (m) => `${m.x.toString()},${m.y.toString()}`,
+    ),
   );
 
   // Hover preview: preview board state after capturing pieces (based on viewer perspective)
@@ -309,7 +345,9 @@ export default function App() {
 
       if (events.length === 0) {
         setGameState(nextState);
-        setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev, isHumanTurn));
+        setSelectedSkill((prev) =>
+          getNextSelectedSkill(nextState, prev, isHumanTurn),
+        );
         if (nextState.isGameOver) {
           setShowGameOverModal(true);
         }
@@ -323,7 +361,9 @@ export default function App() {
       intermediateBoardRef.current = initialIntermediateBoard;
       setIntermediateBoard(initialIntermediateBoard);
 
-      const updateIntermediateBoard = (updater: (prev: Board) => Board): Board => {
+      const updateIntermediateBoard = (
+        updater: (prev: Board) => Board,
+      ): Board => {
         const current = intermediateBoardRef.current ?? gameState.board;
         const next = updater(current);
         intermediateBoardRef.current = next;
@@ -336,7 +376,9 @@ export default function App() {
           onPiecePlaced: (pos, piece) => {
             updateIntermediateBoard((board) =>
               board.map((row, rY) =>
-                row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+                row.map((cell, rX) =>
+                  rX === pos.x && rY === pos.y ? { ...piece } : cell,
+                ),
               ),
             );
             setPoppingCoord(pos);
@@ -347,7 +389,9 @@ export default function App() {
           onPioneerPlaced: (pos, piece) => {
             const next = updateIntermediateBoard((board) =>
               board.map((row, rY) =>
-                row.map((cell, rX) => (rX === pos.x && rY === pos.y ? { ...piece } : cell)),
+                row.map((cell, rX) =>
+                  rX === pos.x && rY === pos.y ? { ...piece } : cell,
+                ),
               ),
             );
             setPoppingCoord(pos);
@@ -374,9 +418,14 @@ export default function App() {
             }
             if (closest) {
               const bridgeId = `${Date.now().toString()}-${Math.random().toString()}`;
-              setPioneerBridges((prev) => [...prev, { id: bridgeId, from: pos, to: closest }]);
+              setPioneerBridges((prev) => [
+                ...prev,
+                { id: bridgeId, from: pos, to: closest },
+              ]);
               setTimeout(() => {
-                setPioneerBridges((prev) => prev.filter((b) => b.id !== bridgeId));
+                setPioneerBridges((prev) =>
+                  prev.filter((b) => b.id !== bridgeId),
+                );
               }, 800);
             }
           },
@@ -399,7 +448,8 @@ export default function App() {
                     ? {
                         ...cell,
                         teamId: toTeamId,
-                        skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                        skillType:
+                          cell.skillType === "BOMB" ? cell.skillType : "NONE",
                         duration: undefined,
                         isRevealed: true,
                       }
@@ -419,7 +469,10 @@ export default function App() {
           },
           onRaycastBlocked: (wallCoord) => {
             const rippleId = `${Date.now().toString()}-${Math.random().toString()}`;
-            setShieldRipples((prev) => [...prev, { id: rippleId, coord: wallCoord }]);
+            setShieldRipples((prev) => [
+              ...prev,
+              { id: rippleId, coord: wallCoord },
+            ]);
             setTimeout(() => {
               setShieldRipples((prev) => prev.filter((r) => r.id !== rippleId));
             }, 600);
@@ -440,14 +493,18 @@ export default function App() {
             updateIntermediateBoard((board) =>
               board.map((row, rY) =>
                 row.map((cell, rX) => {
-                  if (reversedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                  if (
+                    reversedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                    cell
+                  ) {
                     if (cell.skillType === "PIERCE") {
                       return { ...cell, isRevealed: true };
                     }
                     return {
                       ...cell,
                       teamId: defenderTeamId,
-                      skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                      skillType:
+                        cell.skillType === "BOMB" ? cell.skillType : "NONE",
                       duration: undefined,
                       isRevealed: true,
                     };
@@ -458,24 +515,33 @@ export default function App() {
             );
 
             const vortexId = `${Date.now().toString()}-${Math.random().toString()}`;
-            setAbyssVortices((prev) => [...prev, { id: vortexId, center, reversedCoords }]);
+            setAbyssVortices((prev) => [
+              ...prev,
+              { id: vortexId, center, reversedCoords },
+            ]);
             setTimeout(() => {
               setAbyssVortices((prev) => prev.filter((v) => v.id !== vortexId));
             }, 750);
           },
           onBombTriggered: (center, blastCoords, teamId) => {
-            const blastSet = new Set(blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`));
+            const blastSet = new Set(
+              blastCoords.map((c) => `${c.x.toString()},${c.y.toString()}`),
+            );
             updateIntermediateBoard((board) =>
               board.map((row, rY) =>
                 row.map((cell, rX) => {
-                  if (blastSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                  if (
+                    blastSet.has(`${rX.toString()},${rY.toString()}`) &&
+                    cell
+                  ) {
                     if (cell.skillType === "PIERCE") {
                       return { ...cell, isRevealed: true };
                     }
                     return {
                       ...cell,
                       teamId,
-                      skillType: cell.skillType === "BOMB" ? cell.skillType : "NONE",
+                      skillType:
+                        cell.skillType === "BOMB" ? cell.skillType : "NONE",
                       duration: undefined,
                       isRevealed: true,
                     };
@@ -498,7 +564,10 @@ export default function App() {
             updateIntermediateBoard((board) =>
               board.map((row, rY) =>
                 row.map((cell, rX) => {
-                  if (affectedSet.has(`${rX.toString()},${rY.toString()}`) && cell) {
+                  if (
+                    affectedSet.has(`${rX.toString()},${rY.toString()}`) &&
+                    cell
+                  ) {
                     const nextSkill =
                       cell.skillType === "BOMB" || cell.skillType === "COUNTER"
                         ? "NONE"
@@ -523,7 +592,10 @@ export default function App() {
           },
           onAddFloatingText: (text, pos, variant) => {
             const textId = `${Date.now().toString()}-${Math.random().toString()}`;
-            setFloatingTexts((prev) => [...prev, { id: textId, text, coord: pos, variant }]);
+            setFloatingTexts((prev) => [
+              ...prev,
+              { id: textId, text, coord: pos, variant },
+            ]);
             setTimeout(() => {
               setFloatingTexts((prev) => prev.filter((t) => t.id !== textId));
             }, 1250);
@@ -547,7 +619,9 @@ export default function App() {
 
         setGameState(nextState);
         setEventLogs((prev) => [...events, ...prev]);
-        setSelectedSkill((prev) => getNextSelectedSkill(nextState, prev, isHumanTurn));
+        setSelectedSkill((prev) =>
+          getNextSelectedSkill(nextState, prev, isHumanTurn),
+        );
         if (nextState.isGameOver) {
           setShowGameOverModal(true);
         }
@@ -572,7 +646,8 @@ export default function App() {
       const timer = setTimeout(() => {
         try {
           const action =
-            aiAction ?? selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
+            aiAction ??
+            selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
           const { nextState, events } = dispatch(gameState, action);
           void executeEventChoreography(nextState, events, action);
         } catch (err) {
@@ -614,7 +689,9 @@ export default function App() {
   const handleAiStep = () => {
     if (gameState.isGameOver || isAnimating || !isCurrentPlayerAi) return;
     try {
-      const action = aiAction ?? selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
+      const action =
+        aiAction ??
+        selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
       const { nextState, events } = dispatch(gameState, action);
       void executeEventChoreography(nextState, events, action);
     } catch (err) {
@@ -663,10 +740,18 @@ export default function App() {
   };
 
   const handlePassTurn = () => {
-    if (isReplayMode || isAnimating || isCurrentPlayerAi || gameState.isGameOver) {
+    if (
+      isReplayMode ||
+      isAnimating ||
+      isCurrentPlayerAi ||
+      gameState.isGameOver
+    ) {
       return;
     }
-    if (availableMoves.standardMoves.length > 0 || availableMoves.pioneerMoves.length > 0) {
+    if (
+      availableMoves.standardMoves.length > 0 ||
+      availableMoves.pioneerMoves.length > 0
+    ) {
       handleShowToast("目前盤面仍有合法落子點，無法跳過回合！", "warning");
       return;
     }
@@ -721,7 +806,10 @@ export default function App() {
 
   const handleOpenReplay = (targetIndex?: number) => {
     const history = matchTracker.getHistory();
-    const session = createReplaySession(history, targetIndex ?? history.steps.length - 1);
+    const session = createReplaySession(
+      history,
+      targetIndex ?? history.steps.length - 1,
+    );
     setReplaySession(session);
     setReplayIndex(session.getCurrentIndex());
     setIsReplayAutoPlaying(false);
@@ -735,7 +823,10 @@ export default function App() {
   };
 
   const handleImportSuccess = (importedHistory: MatchHistory) => {
-    const session = createReplaySession(importedHistory, importedHistory.steps.length - 1);
+    const session = createReplaySession(
+      importedHistory,
+      importedHistory.steps.length - 1,
+    );
     setReplaySession(session);
     setReplayIndex(session.getCurrentIndex());
     setIsReplayAutoPlaying(false);
@@ -750,7 +841,8 @@ export default function App() {
 
   useEffect(() => {
     if (isReplayMode && isReplayAutoPlaying && replaySession) {
-      const intervalMs = replaySpeed === "0.5x" ? 1200 : replaySpeed === "1x" ? 600 : 300;
+      const intervalMs =
+        replaySpeed === "0.5x" ? 1200 : replaySpeed === "1x" ? 600 : 300;
       const timer = setInterval(() => {
         if (replaySession.canStepForward()) {
           replaySession.stepForward();
@@ -768,7 +860,9 @@ export default function App() {
   }, [isReplayMode, isReplayAutoPlaying, replaySession, replaySpeed]);
 
   // Team piece count
-  const neutralCount = currentBoard.flat().filter((p) => p?.teamId === 0).length;
+  const neutralCount = currentBoard
+    .flat()
+    .filter((p) => p?.teamId === 0).length;
   const team1Count = currentBoard.flat().filter((p) => p?.teamId === 1).length;
   const team2Count = currentBoard.flat().filter((p) => p?.teamId === 2).length;
 
@@ -820,7 +914,7 @@ export default function App() {
       )}
 
       {/* Screen Flash Overlay for Abyss Counter */}
-      {screenFlash && (
+      {screenFlash !== null && screenFlash !== "" && (
         <div
           className="pointer-events-none fixed inset-0 z-50 bg-purple-950/70 backdrop-blur-xs transition-opacity duration-200"
           aria-hidden="true"
@@ -837,10 +931,16 @@ export default function App() {
         currentTurn={gameState.currentTurn}
         mapPreset={gameState.mapPreset}
         gameMode={gameMode}
-        onClose={() => setShowGameOverModal(false)}
+        onClose={() => {
+          setShowGameOverModal(false);
+        }}
         onReset={handleReset}
-        onOpenReplay={() => handleOpenReplay(0)}
-        onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenReplay={() => {
+          handleOpenReplay(0);
+        }}
+        onOpenExport={() => {
+          setIsExportModalOpen(true);
+        }}
       />
 
       {/* Game Header */}
@@ -868,10 +968,16 @@ export default function App() {
         onReset={handleReset}
         isReplayMode={isReplayMode}
         recordedTurns={recordedTurns}
-        onOpenReplay={() => handleOpenReplay()}
+        onOpenReplay={() => {
+          handleOpenReplay();
+        }}
         onExitReplay={handleExitReplay}
-        onOpenExport={() => setIsExportModalOpen(true)}
-        onOpenImport={() => setIsImportModalOpen(true)}
+        onOpenExport={() => {
+          setIsExportModalOpen(true);
+        }}
+        onOpenImport={() => {
+          setIsImportModalOpen(true);
+        }}
       />
 
       {/* Map Preset Bar */}
@@ -915,7 +1021,11 @@ export default function App() {
         gameMode={gameMode}
         isAiPlaying={isAiPlaying}
         activePlayerName={
-          activePlayer ? (activePlayer.teamId === 1 ? "第一隊" : "第二隊") : undefined
+          activePlayer
+            ? activePlayer.teamId === 1
+              ? "第一隊"
+              : "第二隊"
+            : undefined
         }
         activePlayerTeamId={activePlayer?.teamId ?? 1}
         isCurrentPlayerAi={isCurrentPlayerAi}
@@ -926,7 +1036,9 @@ export default function App() {
         dropZone={effectiveDropZone}
         mapPreset={gameState.mapPreset}
         onExitReplay={handleExitReplay}
-        onShowGameOverModal={() => setShowGameOverModal(true)}
+        onShowGameOverModal={() => {
+          setShowGameOverModal(true);
+        }}
         onReset={handleReset}
       />
 
@@ -937,7 +1049,9 @@ export default function App() {
           <PlayerCard
             teamId={1}
             player={player1}
-            isActive={effectiveDisplayedState.activePlayerId === (player1?.id ?? 1)}
+            isActive={
+              effectiveDisplayedState.activePlayerId === (player1?.id ?? 1)
+            }
             isAi={isPlayer1Ai}
             isGodMode={isGodMode}
             specialsCount={player1SpecialsCount}
@@ -984,7 +1098,9 @@ export default function App() {
           <PlayerCard
             teamId={2}
             player={player2}
-            isActive={effectiveDisplayedState.activePlayerId === (player2?.id ?? 2)}
+            isActive={
+              effectiveDisplayedState.activePlayerId === (player2?.id ?? 2)
+            }
             isAi={isPlayer2Ai}
             isGodMode={isGodMode}
             specialsCount={player2SpecialsCount}
@@ -1024,7 +1140,9 @@ export default function App() {
       {/* Match History Export Modal */}
       <ExportModal
         isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
+        onClose={() => {
+          setIsExportModalOpen(false);
+        }}
         history={matchTracker.getHistory()}
         onShowToast={handleShowToast}
       />
@@ -1032,7 +1150,9 @@ export default function App() {
       {/* Match History Import Modal */}
       <ImportModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => {
+          setIsImportModalOpen(false);
+        }}
         onImportSuccess={handleImportSuccess}
         onShowToast={handleShowToast}
       />

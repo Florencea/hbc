@@ -1,4 +1,9 @@
-import type { MapPreset, MaskedPiece, Piece, SkillType } from "../engine/index.ts";
+import type {
+  MapPreset,
+  MaskedPiece,
+  Piece,
+  SkillType,
+} from "../engine/index.ts";
 
 export type GameMode = "PVP" | "PVE" | "AI_VS_AI";
 
@@ -22,7 +27,10 @@ export function getTeamName(teamId: number): string {
   return "第二隊（白方）";
 }
 
-export function getLegalMarkerClass(teamId: number, isPioneer: boolean): string {
+export function getLegalMarkerClass(
+  teamId: number,
+  isPioneer: boolean,
+): string {
   if (isPioneer) {
     return teamId === 1
       ? "h-2.5 w-2.5 animate-pulse rounded-full bg-zinc-950 ring-2 ring-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]"
@@ -33,23 +41,24 @@ export function getLegalMarkerClass(teamId: number, isPioneer: boolean): string 
     : "h-2.5 w-2.5 animate-pulse rounded-full bg-white ring-2 ring-zinc-300 shadow-[0_0_8px_rgba(255,255,255,0.9)]";
 }
 
-export const MAP_PRESETS: { preset: MapPreset; label: string; desc: string }[] = [
-  {
-    preset: "CROSSROADS",
-    label: "十字路口",
-    desc: "中心十字錨點",
-  },
-  {
-    preset: "ARCHIPELAGO",
-    label: "群島孤域",
-    desc: "四象限孤島",
-  },
-  {
-    preset: "TRENCHES",
-    label: "交錯戰壕",
-    desc: "縱橫交錯道",
-  },
-];
+export const MAP_PRESETS: { preset: MapPreset; label: string; desc: string }[] =
+  [
+    {
+      preset: "CROSSROADS",
+      label: "十字路口",
+      desc: "中心十字錨點",
+    },
+    {
+      preset: "ARCHIPELAGO",
+      label: "群島孤域",
+      desc: "四象限孤島",
+    },
+    {
+      preset: "TRENCHES",
+      label: "交錯戰壕",
+      desc: "縱橫交錯道",
+    },
+  ];
 
 export interface SkillVisualConfig {
   label: string;
@@ -97,7 +106,8 @@ export const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
     label: "深淵復仇者 (黑)",
     annotationStyle:
       "bg-slate-950/95 text-purple-300 border border-purple-400/80 shadow-[0_0_6px_rgba(168,85,247,0.7)]",
-    buttonStyle: "bg-slate-950/90 text-purple-200 border-purple-900/80 hover:border-purple-600/80",
+    buttonStyle:
+      "bg-slate-950/90 text-purple-200 border-purple-900/80 hover:border-purple-600/80",
     code: "仇",
   },
 };
@@ -178,7 +188,8 @@ export const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     trigger: "主動落子貫穿",
     effect:
       "射線無視敵方「翡翠城壁」阻擋直接貫穿翻轉，且在翻轉敵方「深淵復仇者」時完全免疫其反噬。行使穿透或免疫特性時揭示真身。",
-    tactics: "破防王牌！專門克制敵方城壁鐵桶陣與復仇陷阱，適合用來搶佔角落或強行突破敵方封鎖線。",
+    tactics:
+      "破防王牌！專門克制敵方城壁鐵桶陣與復仇陷阱，適合用來搶佔角落或強行突破敵方封鎖線。",
   },
   BOMB: {
     name: "殺戮盛宴",
@@ -203,7 +214,8 @@ export const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     trigger: "每回合結束脈衝",
     effect:
       "放置後每回合結束時向周圍 3x3 釋放淨化光環，持續 3 回合（duration: 3）後自毀衰退。範圍內所有敵我特殊棋無聲轉化為施放方之常規棋（不觸發炸彈與反擊）。",
-    tactics: "和平解除敵方致命地雷陣與反擊陷阱的戰略神器，能毫無風險地奪取特技據點並消除威脅。",
+    tactics:
+      "和平解除敵方致命地雷陣與反擊陷阱的戰略神器，能毫無風險地奪取特技據點並消除威脅。",
   },
   COUNTER: {
     name: "深淵復仇者",
@@ -215,7 +227,8 @@ export const SKILL_DETAILS: Record<SkillType, SkillInfoDetail> = {
     trigger: "被敵方翻轉時",
     effect:
       "以未揭示狀態潛伏於盤面。當被敵方棋子（天空守望者除外）翻轉時，瞬間逆轉整條吃子射線，將敵方落下的棋子及沿途所有翻轉棋子強行反噬奪為己方棋子！",
-    tactics: "最高威懾力的致命陷阱！故意露出破撻誘使敵方大面積夾擊，達成一擊必殺的反客為主逆轉。",
+    tactics:
+      "最高威懾力的致命陷阱！故意露出破撻誘使敵方大面積夾擊，達成一擊必殺的反客為主逆轉。",
   },
 };
 

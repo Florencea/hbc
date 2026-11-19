@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import { dispatch } from "../pipeline.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
-import { SKILL_SPECS, type Board, type GameEvent, type GameState, type Player } from "../types.ts";
+import {
+  SKILL_SPECS,
+  type Board,
+  type GameEvent,
+  type GameState,
+  type Player,
+} from "../types.ts";
 import { createEmptyBoard, makePiece, setCell } from "./helpers.ts";
 
 function createEconomyPlayer(
@@ -36,7 +42,11 @@ function createEconomyPlayer(
   };
 }
 
-function makeEconomyTestState(board: Board, players: Player[], activePlayerId = 1): GameState {
+function makeEconomyTestState(
+  board: Board,
+  players: Player[],
+  activePlayerId = 1,
+): GameState {
   return {
     board,
     size: 16,

@@ -234,7 +234,11 @@ export function GameHeader({
           type="button"
           onClick={onOpenExport}
           disabled={isAnimating || recordedTurns === 0}
-          title={recordedTurns === 0 ? "尚無已下棋步可匯出" : "匯出 HBC-PGN / JSON 棋譜"}
+          title={
+            recordedTurns === 0
+              ? "尚無已下棋步可匯出"
+              : "匯出 HBC-PGN / JSON 棋譜"
+          }
           className="cursor-pointer rounded border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           📥 匯出

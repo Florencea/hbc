@@ -31,7 +31,10 @@ function getVariantBadgeClass(variant: CombatTextVariant): string {
   }
 }
 
-export function FloatingCombatText({ items, boardSize }: FloatingCombatTextProps) {
+export function FloatingCombatText({
+  items,
+  boardSize,
+}: FloatingCombatTextProps) {
   if (items.length === 0) return null;
 
   return (
@@ -43,7 +46,7 @@ export function FloatingCombatText({ items, boardSize }: FloatingCombatTextProps
         return (
           <div
             key={item.id}
-            className="animate-float-combat absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap select-none"
+            className="absolute -translate-x-1/2 -translate-y-1/2 animate-float-combat whitespace-nowrap select-none"
             style={{
               left: `${leftPercent.toString()}%`,
               top: `${topPercent.toString()}%`,

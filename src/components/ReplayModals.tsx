@@ -23,7 +23,12 @@ export interface ImportModalProps {
   onShowToast: (msg: string, type: "info" | "success" | "error") => void;
 }
 
-export function ExportModal({ isOpen, onClose, history, onShowToast }: ExportModalProps) {
+export function ExportModal({
+  isOpen,
+  onClose,
+  history,
+  onShowToast,
+}: ExportModalProps) {
   const [tab, setTab] = useState<"PGN" | "JSON">("PGN");
 
   if (!isOpen) return null;
@@ -64,7 +69,9 @@ export function ExportModal({ isOpen, onClose, history, onShowToast }: ExportMod
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">📥</span>
-            <h2 className="text-base font-bold text-white">匯出對局棋譜 (Export Match Notation)</h2>
+            <h2 className="text-base font-bold text-white">
+              匯出對局棋譜 (Export Match Notation)
+            </h2>
           </div>
           <button
             type="button"
@@ -142,7 +149,12 @@ export function ExportModal({ isOpen, onClose, history, onShowToast }: ExportMod
   );
 }
 
-export function ImportModal({ isOpen, onClose, onImportSuccess, onShowToast }: ImportModalProps) {
+export function ImportModal({
+  isOpen,
+  onClose,
+  onImportSuccess,
+  onShowToast,
+}: ImportModalProps) {
   const [inputText, setInputText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -191,10 +203,17 @@ export function ImportModal({ isOpen, onClose, onImportSuccess, onShowToast }: I
         return;
       }
 
-      const { history } = replayMatchActions(parsed.mapPreset, parsed.boardSize, parsed.actions);
+      const { history } = replayMatchActions(
+        parsed.mapPreset,
+        parsed.boardSize,
+        parsed.actions,
+      );
 
       onImportSuccess(history);
-      onShowToast(`已成功重建並載入 PGN 棋譜 (${history.steps.length.toString()} 手)！`, "success");
+      onShowToast(
+        `已成功重建並載入 PGN 棋譜 (${history.steps.length.toString()} 手)！`,
+        "success",
+      );
       onClose();
     } catch (err) {
       if (err instanceof Error) {
@@ -212,7 +231,9 @@ export function ImportModal({ isOpen, onClose, onImportSuccess, onShowToast }: I
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">📤</span>
-            <h2 className="text-base font-bold text-white">載入外部棋譜 (Import Match Record)</h2>
+            <h2 className="text-base font-bold text-white">
+              載入外部棋譜 (Import Match Record)
+            </h2>
           </div>
           <button
             type="button"
@@ -255,7 +276,7 @@ export function ImportModal({ isOpen, onClose, onImportSuccess, onShowToast }: I
         </div>
 
         {/* Error message */}
-        {errorMessage && (
+        {errorMessage !== null && errorMessage !== "" && (
           <div className="mt-2 rounded-lg border border-rose-500/50 bg-rose-950/60 p-2.5 text-xs font-semibold text-rose-300">
             ⚠️ {errorMessage}
           </div>

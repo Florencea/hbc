@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import { getAvailableMoves } from "../raycast.ts";
 import { sanitizeForViewer } from "../sanitize.ts";
 import type { GameState } from "../types.ts";
@@ -185,6 +185,8 @@ describe("sanitizeForViewer (Fog of War)", () => {
 
     // Under sanitized state, (4, 5) captures through (5, 5) for BOTH NONE and PIERCE
     expect(movesNone.standardMoves).toEqual(movesPierce.standardMoves);
-    expect(movesNone.standardMoves.some((c) => c.x === 4 && c.y === 5)).toBe(true);
+    expect(movesNone.standardMoves.some((c) => c.x === 4 && c.y === 5)).toBe(
+      true,
+    );
   });
 });

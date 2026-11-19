@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vite-plus/test";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import { describe, expect, it } from "vitest";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 import type { GameEvent } from "../types.ts";
 import {
   createInitialGame,
@@ -41,7 +46,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(res1.nextState.board[2]?.[4]?.playerId).toBe(1);
 
     const flipEvent1 = res1.events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(flipEvent1).toBeDefined();
     expect(flipEvent1?.toTeamId).toBe(1);
@@ -89,9 +95,9 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     // (1, 3) would capture (1, 2) against (1, 1), but is far outside dropZone (center 7, 7 radius 2)
     const p1DropZone = player1?.dropZone;
     expect(p1DropZone).toBeDefined();
-    expect(getDistance({ x: 3, y: 1 }, p1DropZone?.center ?? { x: 0, y: 0 })).toBeGreaterThan(
-      p1DropZone?.radius ?? 0,
-    );
+    expect(
+      getDistance({ x: 3, y: 1 }, p1DropZone?.center ?? { x: 0, y: 0 }),
+    ).toBeGreaterThan(p1DropZone?.radius ?? 0);
 
     expect(() =>
       dispatch(state, {
@@ -145,7 +151,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     expect(nextState.isDropPhase).toBe(true);
 
     const flip = events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(flip).toBeDefined();
     expect(flip?.coords).toContainEqual({ x: 7, y: 6 });
@@ -261,7 +268,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
       skillType: "NONE",
     });
     const archFlip = archRes.events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(archFlip).toBeDefined();
     expect(archFlip?.fromTeamIds).toContain(0);
@@ -297,7 +305,10 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
     }
 
     // Verify Player 1 has legal moves along the trench
-    const trenchLegalMoves = getLegalMoves(trenchState, trenchState.activePlayerId);
+    const trenchLegalMoves = getLegalMoves(
+      trenchState,
+      trenchState.activePlayerId,
+    );
     expect(trenchLegalMoves.length).toBeGreaterThan(0);
     const trenchMove = trenchLegalMoves[0];
     if (!trenchMove) {
@@ -311,7 +322,8 @@ describe("Map Templates, Neutral Anchors & Drop Phase (map.test.ts)", () => {
       skillType: "NONE",
     });
     const trenchFlip = trenchRes.events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(trenchFlip).toBeDefined();
     expect(trenchFlip?.fromTeamIds).toContain(0);

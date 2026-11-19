@@ -1,12 +1,9 @@
 name: Deploy to GitHub Pages
 
 on:
-  workflow_run:
-    workflows: ["CI"]
+  push:
     branches:
       - main
-    types:
-      - completed
   workflow_dispatch:
 
 env:
@@ -25,29 +22,26 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to GitHub Pages
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.22.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
-          cache: true
-          cache-toolchain: true
+          cache: npm
 
       - name: Install dependencies
-        run: vp install
+        run: npm ci
 
       - name: Build production bundle
-        run: vp build
+        run: npm run build
         env:
           BASE_PATH: /hbc/
 

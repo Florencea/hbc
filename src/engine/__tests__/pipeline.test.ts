@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import type { GameEvent } from "../types.ts";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 import { createInitialState, dispatch } from "../pipeline.ts";
 
 describe("pipeline", () => {
@@ -33,7 +38,8 @@ describe("pipeline", () => {
     expect(placedEvent).toBeDefined();
 
     const flipEvent = events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(flipEvent).toBeDefined();
     expect(flipEvent?.toTeamId).toBe(1);
@@ -70,7 +76,8 @@ describe("pipeline", () => {
 
     // Verify events
     const blockedEvent = events.find(
-      (e): e is Extract<GameEvent, { type: "RAYCAST_BLOCKED" }> => e.type === "RAYCAST_BLOCKED",
+      (e): e is Extract<GameEvent, { type: "RAYCAST_BLOCKED" }> =>
+        e.type === "RAYCAST_BLOCKED",
     );
     expect(blockedEvent).toBeDefined();
     expect(blockedEvent?.coord).toEqual({ x: 4, y: 2 });
@@ -130,7 +137,8 @@ describe("pipeline", () => {
     expect(nextState.board[2]?.[4]?.isRevealed).toBe(true);
 
     const counterEvent = events.find(
-      (e): e is Extract<GameEvent, { type: "COUNTER_TRIGGERED" }> => e.type === "COUNTER_TRIGGERED",
+      (e): e is Extract<GameEvent, { type: "COUNTER_TRIGGERED" }> =>
+        e.type === "COUNTER_TRIGGERED",
     );
     expect(counterEvent).toBeDefined();
     expect(counterEvent?.defenderTeamId).toBe(2);
@@ -159,7 +167,8 @@ describe("pipeline", () => {
 
     // COUNTER triggered -> chained into BOMB at (3, 3)
     const bombEvent = events.find(
-      (e): e is Extract<GameEvent, { type: "BOMB_TRIGGERED" }> => e.type === "BOMB_TRIGGERED",
+      (e): e is Extract<GameEvent, { type: "BOMB_TRIGGERED" }> =>
+        e.type === "BOMB_TRIGGERED",
     );
     expect(bombEvent).toBeDefined();
     expect(bombEvent?.coord).toEqual({ x: 3, y: 3 });

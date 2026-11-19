@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "vitest";
 import { IllegalMoveError } from "../map.ts";
 import { dispatch } from "../pipeline.ts";
-import { getAvailableMoves, getLegalMoves, getPioneerMoves } from "../raycast.ts";
+import {
+  getAvailableMoves,
+  getLegalMoves,
+  getPioneerMoves,
+} from "../raycast.ts";
 import type { GameEvent } from "../types.ts";
-import { createEmptyBoard, makePiece, makeTestState, setCell } from "./helpers.ts";
+import {
+  createEmptyBoard,
+  makePiece,
+  makeTestState,
+  setCell,
+} from "./helpers.ts";
 
 describe("pioneer placement (開拓落子 / bridge step)", () => {
   it("pioneer_activates_when_no_standard_captures_exist", () => {
@@ -96,7 +105,9 @@ describe("pioneer placement (開拓落子 / bridge step)", () => {
         coord: { x: 5, y: 4 },
         skillType: "NONE",
       });
-    }).toThrow(new IllegalMoveError("Illegal move: must capture at least one piece"));
+    }).toThrow(
+      new IllegalMoveError("Illegal move: must capture at least one piece"),
+    );
   });
 
   it("pioneer_bridging_enables_subsequent_captures", () => {
@@ -143,7 +154,8 @@ describe("pioneer placement (開拓落子 / bridge step)", () => {
     expect(turn3State.board[5]?.[6]?.teamId).toBe(2);
 
     const flipEvent = p2Events.find(
-      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> => e.type === "FLIP_BATCH",
+      (e): e is Extract<GameEvent, { type: "FLIP_BATCH" }> =>
+        e.type === "FLIP_BATCH",
     );
     expect(flipEvent).toBeDefined();
     expect(flipEvent?.toTeamId).toBe(2);
@@ -177,7 +189,11 @@ describe("pioneer placement (開拓落子 / bridge step)", () => {
     // Event sequence check
     expect(events.some((e) => e.type === "PIECE_PLACED")).toBe(true);
     expect(events.some((e) => e.type === "PIONEER_PLACED")).toBe(true);
-    expect(events.some((e) => e.type === "PIECE_REVEALED" && e.skillType === "PURIFY")).toBe(true);
+    expect(
+      events.some(
+        (e) => e.type === "PIECE_REVEALED" && e.skillType === "PURIFY",
+      ),
+    ).toBe(true);
 
     // PURIFY pulse activates at turn end, converting adjacent enemy at (7, 6)
     const pulseEvent = events.find((e) => e.type === "PURIFY_PULSE");
@@ -234,6 +250,10 @@ describe("pioneer placement (開拓落子 / bridge step)", () => {
         coord: { x: 4, y: 7 },
         skillType: "NONE",
       });
-    }).toThrow(new IllegalMoveError("Placement outside assigned drop zone during Drop Phase"));
+    }).toThrow(
+      new IllegalMoveError(
+        "Placement outside assigned drop zone during Drop Phase",
+      ),
+    );
   });
 });

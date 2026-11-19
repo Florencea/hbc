@@ -7,7 +7,6 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import type {
   Diagnostic,
-  InitializeParams,
   Position,
   TextEdit,
 } from "vscode-languageserver-protocol/node";
@@ -31,7 +30,8 @@ import {
 
 // --- Supported Extensions & Language Mappings ---
 
-const SUPPORTED_GLOB_EXTENSIONS = "**/*.{tsx,ts,jsx,js,mjs,cjs,html,css,postcss,vue,svelte,astro}";
+const SUPPORTED_GLOB_EXTENSIONS =
+  "**/*.{tsx,ts,jsx,js,mjs,cjs,html,css,postcss,vue,svelte,astro}";
 
 const EXTENSION_TO_LANGUAGE_ID: Record<string, string> = {
   ".tsx": "typescriptreact",
@@ -86,7 +86,9 @@ function normalizeExcludePattern(rawPattern: string): string {
   return normalized;
 }
 
-async function loadNormalizedExclusions(projectRoot: string): Promise<string[]> {
+async function loadNormalizedExclusions(
+  projectRoot: string,
+): Promise<string[]> {
   const patterns = new Set<string>(BASELINE_EXCLUDES);
 
   // 1. Read .vscode/settings.json (if present) via dynamic JSON import
@@ -95,9 +97,15 @@ async function loadNormalizedExclusions(projectRoot: string): Promise<string[]> 
     try {
       const raw = await fs.readFile(vscodeSettingsPath, "utf8");
       const parsed: unknown = JSON.parse(raw);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        !Array.isArray(parsed)
+      ) {
         const tailwindExcludes =
-          "tailwindCSS.files.exclude" in parsed ? parsed["tailwindCSS.files.exclude"] : undefined;
+          "tailwindCSS.files.exclude" in parsed
+            ? parsed["tailwindCSS.files.exclude"]
+            : undefined;
         if (Array.isArray(tailwindExcludes)) {
           for (const item of tailwindExcludes) {
             if (typeof item === "string") {
@@ -106,8 +114,14 @@ async function loadNormalizedExclusions(projectRoot: string): Promise<string[]> 
           }
         }
 
-        const filesExcludes = "files.exclude" in parsed ? parsed["files.exclude"] : undefined;
-        if (filesExcludes && typeof filesExcludes === "object" && !Array.isArray(filesExcludes)) {
+        const filesExcludes =
+          "files.exclude" in parsed ? parsed["files.exclude"] : undefined;
+        if (
+          filesExcludes !== null &&
+          filesExcludes !== undefined &&
+          typeof filesExcludes === "object" &&
+          !Array.isArray(filesExcludes)
+        ) {
           for (const [key, val] of Object.entries(filesExcludes)) {
             if (val === true) {
               patterns.add(key);
@@ -146,7 +160,9 @@ async function resolveServerBinary(projectRoot: string): Promise<string> {
   // 1. Resolve relative to @tailwindcss/language-server package root
   try {
     const req = createRequire(path.join(projectRoot, "package.json"));
-    const pkgJsonPath = req.resolve("@tailwindcss/language-server/package.json");
+    const pkgJsonPath = req.resolve(
+      "@tailwindcss/language-server/package.json",
+    );
     const pkgDir = path.dirname(pkgJsonPath);
     const binCandidate = path.join(pkgDir, "bin/tailwindcss-language-server");
     if (await fileExists(binCandidate)) {
@@ -157,7 +173,10 @@ async function resolveServerBinary(projectRoot: string): Promise<string> {
   }
 
   // 2. Resolve hoisted binary in node_modules/.bin
-  const hoistedBin = path.join(projectRoot, "node_modules/.bin/tailwindcss-language-server");
+  const hoistedBin = path.join(
+    projectRoot,
+    "node_modules/.bin/tailwindcss-language-server",
+  );
   if (await fileExists(hoistedBin)) {
     return await fs.realpath(hoistedBin);
   }
@@ -171,7 +190,10 @@ async function resolveServerBinary(projectRoot: string): Promise<string> {
 interface LSPClient {
   connection: ReturnType<typeof createProtocolConnection>;
   waitForServerReady: (timeoutMs?: number) => Promise<void>;
-  waitForDiagnostics: (uri: string, timeoutMs?: number) => Promise<Diagnostic[]>;
+  waitForDiagnostics: (
+    uri: string,
+    timeoutMs?: number,
+  ) => Promise<Diagnostic[]>;
   close: () => Promise<void>;
 }
 
@@ -249,8 +271,8 @@ async function createLSPClient(projectRoot: string): Promise<LSPClient> {
 
   return {
     connection,
-    waitForServerReady: (timeoutMs = 5000): Promise<void> => {
-      return new Promise((resolve) => {
+    waitForServerReady: async (timeoutMs = 5000): Promise<void> => {
+      await new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
           onServerReadyCallback = null;
           resolve();
@@ -261,8 +283,11 @@ async function createLSPClient(projectRoot: string): Promise<LSPClient> {
         };
       });
     },
-    waitForDiagnostics: (uri: string, timeoutMs = 800): Promise<Diagnostic[]> => {
-      return new Promise((resolve) => {
+    waitForDiagnostics: async (
+      uri: string,
+      timeoutMs = 800,
+    ): Promise<Diagnostic[]> => {
+      const result = await new Promise<Diagnostic[]>((resolve) => {
         diagnosticsWaiters.set(uri, resolve);
         setTimeout(() => {
           if (diagnosticsWaiters.has(uri)) {
@@ -271,6 +296,7 @@ async function createLSPClient(projectRoot: string): Promise<LSPClient> {
           }
         }, timeoutMs);
       });
+      return result;
     },
     close: async () => {
       try {
@@ -330,7 +356,9 @@ interface LintFileResult {
   fixes: number;
 }
 
-async function collectAsyncIterable<T>(iterable: AsyncIterable<T>): Promise<T[]> {
+async function collectAsyncIterable<T>(
+  iterable: AsyncIterable<T>,
+): Promise<T[]> {
   const items: T[] = [];
   for await (const item of iterable) {
     items.push(item);
@@ -356,14 +384,20 @@ async function resolveTargetFiles(
           const entries = await collectAsyncIterable(
             fs.glob(SUPPORTED_GLOB_EXTENSIONS, {
               cwd: resolved,
-              exclude: (e) => shouldExclude(path.relative(projectRoot, path.join(resolved, e))),
+              exclude: (e) =>
+                shouldExclude(
+                  path.relative(projectRoot, path.join(resolved, e)),
+                ),
             }),
           );
           return entries.map((entry) => path.resolve(resolved, entry));
         }
         if (stat.isFile()) {
           const rel = path.relative(projectRoot, resolved);
-          if (path.matchesGlob(rel, SUPPORTED_GLOB_EXTENSIONS) && !shouldExclude(rel)) {
+          if (
+            path.matchesGlob(rel, SUPPORTED_GLOB_EXTENSIONS) &&
+            !shouldExclude(rel)
+          ) {
             return [resolved];
           }
         }
@@ -378,7 +412,8 @@ async function resolveTargetFiles(
   const entries = await collectAsyncIterable(
     fs.glob(SUPPORTED_GLOB_EXTENSIONS, {
       cwd: searchDir,
-      exclude: (e) => shouldExclude(path.relative(projectRoot, path.join(searchDir, e))),
+      exclude: (e) =>
+        shouldExclude(path.relative(projectRoot, path.join(searchDir, e))),
     }),
   );
   return entries.map((entry) => path.resolve(searchDir, entry));
@@ -397,14 +432,17 @@ async function lintSingleFile(
 
   const diagsPromise = client.waitForDiagnostics(uri);
 
-  await client.connection.sendNotification(DidOpenTextDocumentNotification.type, {
-    textDocument: {
-      uri,
-      languageId,
-      version: 1,
-      text: content,
+  await client.connection.sendNotification(
+    DidOpenTextDocumentNotification.type,
+    {
+      textDocument: {
+        uri,
+        languageId,
+        version: 1,
+        text: content,
+      },
     },
-  });
+  );
 
   const diags = await diagsPromise;
   let diagnosticsCount = 0;
@@ -416,13 +454,17 @@ async function lintSingleFile(
       const fixedDiagnosticRanges = new Set<string>();
 
       const rawActionsList = await Promise.all(
-        diags.map((diag) =>
-          client.connection.sendRequest(CodeActionRequest.type, {
-            textDocument: { uri },
-            range: diag.range,
-            context: { diagnostics: [diag] },
-          }),
-        ),
+        diags.map(async (diag) => {
+          const actions = await client.connection.sendRequest(
+            CodeActionRequest.type,
+            {
+              textDocument: { uri },
+              range: diag.range,
+              context: { diagnostics: [diag] },
+            },
+          );
+          return actions;
+        }),
       );
 
       for (let i = 0; i < diags.length; i++) {
@@ -476,8 +518,13 @@ async function lintSingleFile(
               : typeof diag.code === "number"
                 ? diag.code.toString()
                 : "lint";
-          const message = typeof diag.message === "string" ? diag.message : diag.message.value;
-          console.warn(`  ${rel}:${line.toString()}:${col.toString()} - [${code}] ${message}`);
+          const message =
+            typeof diag.message === "string"
+              ? diag.message
+              : diag.message.value;
+          console.warn(
+            `  ${rel}:${line.toString()}:${col.toString()} - [${code}] ${message}`,
+          );
         }
       }
     } else {
@@ -492,15 +539,21 @@ async function lintSingleFile(
             : typeof diag.code === "number"
               ? diag.code.toString()
               : "lint";
-        const message = typeof diag.message === "string" ? diag.message : diag.message.value;
-        console.error(`  ${rel}:${line.toString()}:${col.toString()} - [${code}] ${message}`);
+        const message =
+          typeof diag.message === "string" ? diag.message : diag.message.value;
+        console.error(
+          `  ${rel}:${line.toString()}:${col.toString()} - [${code}] ${message}`,
+        );
       }
     }
   }
 
-  await client.connection.sendNotification(DidCloseTextDocumentNotification.type, {
-    textDocument: { uri },
-  });
+  await client.connection.sendNotification(
+    DidCloseTextDocumentNotification.type,
+    {
+      textDocument: { uri },
+    },
+  );
 
   return { diagnostics: diagnosticsCount, fixes: fixesCount };
 }
@@ -518,7 +571,7 @@ async function main() {
     allowPositionals: true,
   });
 
-  const isFix = values.fix ?? false;
+  const isFix = values.fix;
   const nonFlagArgs = positionals;
 
   const projectRoot = process.cwd();
@@ -526,10 +579,16 @@ async function main() {
 
   const shouldExclude = (filePath: string): boolean => {
     const normalized = filePath.replace(/\\/g, "/");
-    return exclusionPatterns.some((pattern) => path.matchesGlob(normalized, pattern));
+    return exclusionPatterns.some((pattern) =>
+      path.matchesGlob(normalized, pattern),
+    );
   };
 
-  const targetFiles = await resolveTargetFiles(projectRoot, nonFlagArgs, shouldExclude);
+  const targetFiles = await resolveTargetFiles(
+    projectRoot,
+    nonFlagArgs,
+    shouldExclude,
+  );
 
   if (targetFiles.length === 0) {
     console.log("No eligible Tailwind CSS files found to lint.");
@@ -539,7 +598,7 @@ async function main() {
   const client = await createLSPClient(projectRoot);
 
   try {
-    const initParams: InitializeParams = {
+    const initParams = {
       processId: process.pid,
       rootUri: pathToFileURL(projectRoot).toString(),
       workspaceFolders: [
@@ -587,7 +646,9 @@ async function main() {
 
     if (isFix) {
       if (totalFixes > 0) {
-        console.log(`Successfully auto-fixed ${totalFixes.toString()} issue(s).`);
+        console.log(
+          `Successfully auto-fixed ${totalFixes.toString()} issue(s).`,
+        );
       }
       if (totalDiagnostics > 0) {
         console.warn(
@@ -601,8 +662,12 @@ async function main() {
     }
 
     if (totalDiagnostics > 0) {
-      console.error(`\nFound ${totalDiagnostics.toString()} Tailwind CSS diagnostic issue(s).`);
-      console.error("Run `vpr agent:lint:tailwind:fix` to auto-fix applicable issues.");
+      console.error(
+        `\nFound ${totalDiagnostics.toString()} Tailwind CSS diagnostic issue(s).`,
+      );
+      console.error(
+        "Run `npm run lint:tailwind:fix` to auto-fix applicable issues.",
+      );
       process.exitCode = 1;
       return;
     }

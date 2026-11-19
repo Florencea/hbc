@@ -1,7 +1,11 @@
 import type { Player, SkillType } from "../engine/types.ts";
 import { SKILL_SPECS } from "../engine/types.ts";
 import { cn } from "../lib/cn.ts";
-import { SKILL_CONFIG, SKILL_OPTIONS, type GameMode } from "./gameUiConstants.ts";
+import {
+  SKILL_CONFIG,
+  SKILL_OPTIONS,
+  type GameMode,
+} from "./gameUiConstants.ts";
 import { SkillDetailTooltip } from "./SkillDetailTooltip.tsx";
 
 export interface PlayerCardProps {
@@ -78,13 +82,14 @@ export function PlayerCard({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {!isAi && player?.isForcedSpecial && (
+          {!isAi && player?.isForcedSpecial === true && (
             <span className="animate-pulse rounded border border-amber-500/60 bg-amber-500/25 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-300 ring-1 ring-amber-400/40">
               ⚡ 強制特技
             </span>
           )}
           <span className="rounded-md border border-purple-400/60 bg-purple-950/80 px-2.5 py-0.5 text-[11px] font-black text-purple-200 shadow-sm ring-1 ring-purple-500/40">
-            特技: {isAi && !isGodMode ? "迷霧隱藏" : `${specialsCount.toString()} 枚`}
+            特技:{" "}
+            {isAi && !isGodMode ? "迷霧隱藏" : `${specialsCount.toString()} 枚`}
           </span>
           <span
             className={cn(
@@ -136,7 +141,7 @@ export function PlayerCard({
         </div>
       ) : (
         <>
-          {player?.isForcedSpecial && isActive && (
+          {player?.isForcedSpecial === true && isActive && (
             <div className="flex items-center justify-between rounded-md border border-amber-500/60 bg-amber-950/60 px-2.5 py-1.5 text-xs text-amber-200 shadow-xs">
               <div className="flex items-center gap-1.5 font-bold">
                 <span>⚡</span>
@@ -161,7 +166,8 @@ export function PlayerCard({
 
               const isOutOfStock = !isNone && count <= 0;
               const isForbidden = isNone && (player?.isForcedSpecial ?? false);
-              const isDisabled = isAnimating || !isActive || isOutOfStock || isForbidden || isAi;
+              const isDisabled =
+                isAnimating || !isActive || isOutOfStock || isForbidden || isAi;
               const isSelected = isActive && effectiveSkill === opt.type;
               const config = SKILL_CONFIG[opt.type];
 
@@ -200,7 +206,10 @@ export function PlayerCard({
                       !isSelected &&
                         !isDisabled &&
                         (isNone || count <= 0) &&
-                        cn(config.buttonStyle, "cursor-pointer opacity-85 hover:opacity-100"),
+                        cn(
+                          config.buttonStyle,
+                          "cursor-pointer opacity-85 hover:opacity-100",
+                        ),
                     )}
                   >
                     {/* Piece Name & Stock */}
@@ -233,7 +242,8 @@ export function PlayerCard({
                       <span
                         className={cn(
                           "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
-                          isNone && "border border-slate-700 bg-slate-800 text-slate-300",
+                          isNone &&
+                            "border border-slate-700 bg-slate-800 text-slate-300",
                           !isNone &&
                             count >= maxHand &&
                             "border border-amber-400/80 bg-amber-500/20 text-amber-300",
@@ -246,25 +256,41 @@ export function PlayerCard({
                             "border border-slate-800 bg-slate-900/80 text-slate-500",
                         )}
                       >
-                        {isNone ? "∞" : `${count.toString()}/${maxHand.toString()}`}
+                        {isNone
+                          ? "∞"
+                          : `${count.toString()}/${maxHand.toString()}`}
                       </span>
                     </div>
 
                     {/* Status / Cooldown */}
                     <div className="mt-1.5 w-full border-t border-slate-800/80 pt-1">
                       {isForbidden ? (
-                        <span className="text-[10px] font-medium text-rose-400">🚫 禁落常規棋</span>
+                        <span className="text-[10px] font-medium text-rose-400">
+                          🚫 禁落常規棋
+                        </span>
                       ) : isNone ? (
-                        <span className="text-[10px] text-slate-400">無限庫存</span>
+                        <span className="text-[10px] text-slate-400">
+                          無限庫存
+                        </span>
                       ) : count >= maxHand ? (
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="font-bold text-amber-300">就緒 MAX</span>
-                          <span className="font-mono text-[9px] text-amber-400/90">可部署</span>
+                          <span className="font-bold text-amber-300">
+                            就緒 MAX
+                          </span>
+                          <span className="font-mono text-[9px] text-amber-400/90">
+                            可部署
+                          </span>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center justify-between text-[10px]">
-                            <span className={count === 0 ? "text-amber-400/90" : "text-slate-400"}>
+                            <span
+                              className={
+                                count === 0
+                                  ? "text-amber-400/90"
+                                  : "text-slate-400"
+                              }
+                            >
                               {count === 0 ? "充能中" : "充能"}
                             </span>
                             <span className="font-mono font-bold text-slate-300">

@@ -118,7 +118,9 @@ export function BattlefieldStatusBar({
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
           </span>
           <span className="font-bold tracking-wider">拓荒階段啟動：</span>
-          <span className="text-slate-300">無可夾殺路徑，請於領地 2 格內放置拓荒橋樑棋</span>
+          <span className="text-slate-300">
+            無可夾殺路徑，請於領地 2 格內放置拓荒橋樑棋
+          </span>
         </div>
       ) : isDropPhase ? (
         <div className="flex items-center gap-2 text-amber-300">
@@ -126,13 +128,17 @@ export function BattlefieldStatusBar({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
           </span>
-          <span className="font-bold tracking-wider">初始空降階段（Turn 0 配置）：</span>
+          <span className="font-bold tracking-wider">
+            初始空降階段（Turn 0 配置）：
+          </span>
           <span className="text-slate-300">棋子落點限制於專屬空降區域內</span>
         </div>
       ) : (
         <div className="flex items-center gap-2 text-emerald-300">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          <span className="font-semibold">全域棋局階段：解除空降限制，套用標準黑白棋規則</span>
+          <span className="font-semibold">
+            全域棋局階段：解除空降限制，套用標準黑白棋規則
+          </span>
         </div>
       )}
 
@@ -191,7 +197,8 @@ export function BattlefieldStatusBar({
             </span>
             {dropZone && (
               <span className="hidden rounded bg-slate-800 px-2 py-0.5 text-slate-300 sm:inline">
-                中心 ({dropZone.center.x.toString()}, {dropZone.center.y.toString()}) 半徑=
+                中心 ({dropZone.center.x.toString()},{" "}
+                {dropZone.center.y.toString()}) 半徑=
                 {dropZone.radius.toString()}
               </span>
             )}

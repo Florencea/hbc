@@ -57,7 +57,8 @@ export function MatchTelemetryCard({
               )}
             />
             <span>
-              {activePlayerName ?? "未知玩家"} ({getTeamName(activePlayerTeamId)})
+              {activePlayerName ?? "未知玩家"} (
+              {getTeamName(activePlayerTeamId)})
             </span>
           </span>
         </div>
@@ -118,7 +119,8 @@ export function MatchTelemetryCard({
         <span className="font-semibold text-slate-200">
           {gameState.isDropPhase ? (
             <span className="text-amber-400">
-              初始空降階段（剩餘 {gameState.dropTurnsRemaining.toString()} 回合）
+              初始空降階段（剩餘 {gameState.dropTurnsRemaining.toString()}{" "}
+              回合）
             </span>
           ) : (
             <span className="text-emerald-400">全域對局</span>
@@ -130,7 +132,8 @@ export function MatchTelemetryCard({
         <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
           <span>當前空降區：</span>
           <span className="font-mono text-slate-300">
-            中心 ({dropZone.center.x.toString()}, {dropZone.center.y.toString()})，半徑=
+            中心 ({dropZone.center.x.toString()}, {dropZone.center.y.toString()}
+            )，半徑=
             {dropZone.radius.toString()}
           </span>
         </div>

@@ -1,4 +1,11 @@
-import type { Board, Coord, DropZone, MapPreset, Piece, Player } from "./types.ts";
+import type {
+  Board,
+  Coord,
+  DropZone,
+  MapPreset,
+  Piece,
+  Player,
+} from "./types.ts";
 
 export class IllegalMoveError extends Error {
   constructor(message: string) {
@@ -24,7 +31,12 @@ export function createNeutralPiece(): Piece {
   };
 }
 
-export function setPiece(board: Board, x: number, y: number, piece: Piece | null): void {
+export function setPiece(
+  board: Board,
+  x: number,
+  y: number,
+  piece: Piece | null,
+): void {
   const row = board[y];
   if (row) {
     row[x] = piece;
@@ -41,7 +53,9 @@ export interface GeneratedMap {
 }
 
 function generateCrossroadsMap(size: number, players: Player[]): GeneratedMap {
-  const board: Board = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+  const board: Board = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => null),
+  );
   const dropZones = new Map<number, DropZone>();
   const mid = Math.floor(size / 2);
 
@@ -134,7 +148,9 @@ function generateCrossroadsMap(size: number, players: Player[]): GeneratedMap {
 }
 
 function generateArchipelagoMap(size: number, players: Player[]): GeneratedMap {
-  const board: Board = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+  const board: Board = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => null),
+  );
   const dropZones = new Map<number, DropZone>();
   const offset = Math.max(2, Math.floor(size / 5));
 
@@ -188,7 +204,13 @@ function generateArchipelagoMap(size: number, players: Player[]): GeneratedMap {
 
   players.forEach((player, idx) => {
     const anchor = playerAnchorPositions[idx % playerAnchorPositions.length];
-    if (anchor && anchor.x >= 0 && anchor.x < size && anchor.y >= 0 && anchor.y < size) {
+    if (
+      anchor &&
+      anchor.x >= 0 &&
+      anchor.x < size &&
+      anchor.y >= 0 &&
+      anchor.y < size
+    ) {
       setPiece(board, anchor.x, anchor.y, {
         teamId: player.teamId,
         playerId: player.id,
@@ -206,7 +228,9 @@ function generateArchipelagoMap(size: number, players: Player[]): GeneratedMap {
 }
 
 function generateTrenchesMap(size: number, players: Player[]): GeneratedMap {
-  const board: Board = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+  const board: Board = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => null),
+  );
   const dropZones = new Map<number, DropZone>();
   const mid = Math.floor(size / 2);
 
@@ -240,7 +264,13 @@ function generateTrenchesMap(size: number, players: Player[]): GeneratedMap {
 
   players.forEach((player, idx) => {
     const anchor = anchorPositions[idx % anchorPositions.length];
-    if (anchor && anchor.x >= 0 && anchor.x < size && anchor.y >= 0 && anchor.y < size) {
+    if (
+      anchor &&
+      anchor.x >= 0 &&
+      anchor.x < size &&
+      anchor.y >= 0 &&
+      anchor.y < size
+    ) {
       setPiece(board, anchor.x, anchor.y, {
         teamId: player.teamId,
         playerId: player.id,
@@ -257,7 +287,11 @@ function generateTrenchesMap(size: number, players: Player[]): GeneratedMap {
   return { board, dropZones };
 }
 
-export function generateMap(preset: MapPreset, size: number, players: Player[]): GeneratedMap {
+export function generateMap(
+  preset: MapPreset,
+  size: number,
+  players: Player[],
+): GeneratedMap {
   switch (preset) {
     case "ARCHIPELAGO":
       return generateArchipelagoMap(size, players);

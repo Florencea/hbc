@@ -41,7 +41,10 @@ export function MapPresetBar({
               >
                 <span>{label}</span>
                 <span
-                  className={cn("text-[10px]", isSelected ? "text-blue-200" : "text-slate-400")}
+                  className={cn(
+                    "text-[10px]",
+                    isSelected ? "text-blue-200" : "text-slate-400",
+                  )}
                 >
                   ({desc})
                 </span>
@@ -54,7 +57,10 @@ export function MapPresetBar({
       <div className="flex items-center gap-2">
         <span className="rounded bg-slate-800/80 px-2.5 py-1 text-xs text-slate-300">
           <span className="text-amber-400">⚓ 中立錨點：</span>{" "}
-          <span className="font-bold text-white">{neutralCount.toString()}</span> 顆
+          <span className="font-bold text-white">
+            {neutralCount.toString()}
+          </span>{" "}
+          顆
         </span>
       </div>
     </section>
