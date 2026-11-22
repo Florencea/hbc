@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AbyssVortexEffect,
   type AuraPulseEffect,
@@ -199,14 +199,14 @@ export default function App() {
     (gameMode === "PVE" && gameState.activePlayerId === 1);
 
   // Pre-calculate AI move decision for current state so UI highlights and board previews match the AI's actual choice
-  const aiAction: Action | null = (() => {
+  const aiAction: Action | null = useMemo(() => {
     if (gameState.isGameOver || !isCurrentPlayerAi) return null;
     try {
       return selectBestMove(gameState, gameState.activePlayerId, aiDifficulty);
     } catch {
       return null;
     }
-  })();
+  }, [gameState, isCurrentPlayerAi, aiDifficulty]);
 
   // Resolve effective skill:
   // - For AI players: strictly synchronized with the AI's actual move decision

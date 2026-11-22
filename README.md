@@ -22,8 +22,8 @@ A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend 
   - `BOMB`: 3x3 explosive detonation upon being flipped/captured, converting surrounding tiles and chaining adjacent bombs and counters.
   - `PURIFY`: Turn-end 3x3 cleansing pulse that converts tiles without triggering traps (lasts 3 turns).
   - `COUNTER`: Reverses the active flip batch back to defender faction upon being captured by non-PIERCE pieces.
-- **React Compiler**: Automatic fine-grained memoization via `@vitejs/plugin-react` (`compiler: true`).
-- **TailwindCSS v4**: Design tokens defined in `src/global.css` (`@theme`) and validated via headless `@tailwindcss/language-server`.
+- **Standard Vite + React 19**: Bundled via Vite 8 and official `@vitejs/plugin-react` without React Compiler rewriting.
+- **TailwindCSS v4**: Design tokens defined in `src/global.css` (`@theme`) and deterministically sorted via `prettier-plugin-tailwindcss`.
 
 ## Roadmap & Milestones
 
@@ -47,17 +47,15 @@ npm run dev
 
 ## Verification Gates
 
-The project enforces a strict `.npmrc` policy (`ignore-scripts=true`, `save-exact=true`, `install-strategy=linked`, `strict-peer-deps=true`, `engine-strict=true`) and provides multi-tier verification workflows:
+The project enforces a strict `.npmrc` policy (`ignore-scripts=true`, `save-exact=true`, `install-strategy=linked`, `strict-peer-deps=true`, `engine-strict=true`) and relies on dependency `engines` ranges rather than a root `engines.node` pin. Toolchain updates follow a quarterly or semi-annual cadence with a 7-14 day cooldown window, prioritizing runtime issues via `npm audit --omit=dev`.
 
-### Inner Loop: Fast Feedback (`check:fast` / `agent:verify:inner`)
+### Inner Static Checks
 
 Run during active coding and refactoring for fast feedback:
 
 ```bash
-npm run check:fast
+npm run typecheck && npm run lint && npm run format:check
 ```
-
-Executes `typecheck` (`tsc -b --pretty false`) + `lint` (ESLint `strictTypeChecked` & `stylisticTypeChecked`) + `agent:test:unit` (Vitest unit tests).
 
 ### Complete Verification Gate (`verify`)
 
@@ -69,55 +67,36 @@ npm run verify
 
 Executes:
 
-1. `typecheck` (`tsc -b --pretty false`)
+1. `typecheck` (`tsc -b --pretty false`, TypeScript 6)
 2. `lint` (ESLint `strictTypeChecked` + `stylisticTypeChecked`, `--max-warnings 0`)
-3. `format:check` (Prettier formatting check)
-4. `agent:lint:tailwind` (Tailwind CSS v4 canonical class & diagnostic check)
-5. `check:deadcode` (Knip unused exports and dependency check)
-6. `vitest run` (Unit & Playwright Chromium Browser tests)
-7. `vite build` (Vite production bundle verification)
+3. `format:check` (Prettier formatting and Tailwind CSS v4 class sorting check)
+4. `build` (Vite 8 production bundle verification)
+5. `test` (Vitest `unit` & Playwright Chromium Browser `e2e` tests)
 
-### Agent Verification Ladder (`agent:*`)
-
-For autonomous coding agents, a non-interactive, zero-color ladder is provided:
-
-- `npm run agent:verify:inner`: Static checks (`typecheck` + `lint` + `agent:lint:tailwind`).
-- `npm run agent:test:unit`: Vitest headless unit suite in TAP flat format.
-- `npm run agent:verify:unit`: Inner static checks + unit tests.
-- `npm run agent:test:e2e`: Vitest Browser Mode (`@vitest/browser-playwright`) headless Chromium tests in TAP flat format.
-- `npm run agent:verify:gate`: Full fail-fast verification ladder (`agent:verify:unit` -> `build` -> `agent:test:e2e`).
+For compact non-interactive agent output on test suites, append `-- --reporter=tap-flat --no-color` to `npm run test:unit` or `npm run test:e2e`.
 
 ### Deployment Workflow
 
-- **GitHub Pages Deployment (`.github/workflows/deploy.yml`)**: Runs on `push` to `main` or manual `workflow_dispatch` on `ubuntu-24.04` against `package.json` `engines.node`. Performs `npm ci`, builds with `BASE_PATH=/hbc/`, and deploys `dist/` to GitHub Pages.
-- **Workflow Syntax Linting**: Validate `.github/workflows/*.yml` locally with `npm run agent:lint:ci` (`actionlint`) before staging changes.
+- **GitHub Pages Deployment (`.github/workflows/deploy.yml`)**: Runs on `push` to `main` or manual `workflow_dispatch` on `ubuntu-24.04` using `node-version: "lts/*"`. Performs `npm ci`, builds with `BASE_PATH=/hbc/`, and deploys `dist/` to GitHub Pages.
+- **Workflow Syntax Linting**: Validate `.github/workflows/*.yml` locally with `actionlint` before staging changes.
 
 ## Available Commands & Scripts
 
-| Script                       | Description                                                                        |
-| :--------------------------- | :--------------------------------------------------------------------------------- |
-| `npm run dev`                | Start local Vite development server                                                |
-| `npm run build`              | Build production bundle with Vite                                                  |
-| `npm run preview`            | Preview production build locally                                                   |
-| `npm run typecheck`          | Run strict TypeScript project build checks (`tsc -b --pretty false`)               |
-| `npm run lint`               | Run strict ESLint checks (`--max-warnings 0`)                                      |
-| `npm run lint:fix`           | Run ESLint auto-fix                                                                |
-| `npm run format`             | Format files with Prettier                                                         |
-| `npm run format:check`       | Verify formatting with Prettier                                                    |
-| `npm run lint:tailwind`      | Check Tailwind classes for canonical formatting                                    |
-| `npm run lint:tailwind:fix`  | Auto-fix Tailwind non-canonical classes                                            |
-| `npm test`                   | Run all Vitest projects (`unit` and `e2e`)                                         |
-| `npm run test:unit`          | Run Vitest unit test project                                                       |
-| `npm run test:e2e`           | Run Vitest Browser Mode (`@vitest/browser-playwright`) E2E project                 |
-| `npm run test:setup`         | Install Playwright Chromium browser binaries                                       |
-| `npm run check:deadcode`     | Run Knip deadcode and unused dependency detection                                  |
-| `npm run agent:verify:inner` | Inner-loop validation (`typecheck` + `lint` + `agent:lint:tailwind`)               |
-| `npm run agent:test:unit`    | Flat TAP output Vitest unit execution without colors                               |
-| `npm run agent:test:e2e`     | Flat TAP output Vitest browser E2E execution without colors                        |
-| `npm run agent:verify:gate`  | Automated verification gate (`agent:verify:unit` + `build` + `agent:test:e2e`)     |
-| `npm run verify`             | Complete verification gate (typecheck, lint, format, tailwind, knip, tests, build) |
-| `npm run agent:lint:fix`     | Run ESLint `--fix`, Prettier `--write`, and Tailwind canonical auto-fix            |
-| `npm run agent:lint:ci`      | Check GitHub Actions workflows with `actionlint`                                   |
+| Script                 | Description                                                                       |
+| :--------------------- | :-------------------------------------------------------------------------------- |
+| `npm run dev`          | Start local Vite development server                                               |
+| `npm run build`        | Build production bundle with Vite                                                 |
+| `npm run preview`      | Preview production build locally                                                  |
+| `npm run typecheck`    | Run TypeScript 6 project build checks (`tsc -b --pretty false`)                   |
+| `npm run lint`         | Run strict ESLint checks (`--max-warnings 0`)                                     |
+| `npm run lint:fix`     | Run ESLint auto-fix                                                               |
+| `npm run format`       | Format files and sort Tailwind classes with Prettier                              |
+| `npm run format:check` | Verify formatting and Tailwind class ordering with Prettier                       |
+| `npm test`             | Run all Vitest projects (`unit` and `e2e`)                                        |
+| `npm run test:unit`    | Run Vitest unit test project                                                      |
+| `npm run test:e2e`     | Run Vitest Browser Mode (`@vitest/browser-playwright`) E2E project                |
+| `npm run test:setup`   | Install Playwright Chromium browser binaries                                      |
+| `npm run verify`       | Complete verification gate (`typecheck`, `lint`, `format:check`, `build`, `test`) |
 
 ## Guidelines
 

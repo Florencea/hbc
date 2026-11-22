@@ -20,23 +20,24 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 - **Headless Engine**: Absolutely NO DOM, Canvas, or React inside `src/engine/`. Tested headlessly in pure Node/TypeScript.
 - **Pure State Transitions**: `dispatch(state, action)` is pure and deterministic, returning `{ nextState, events }`.
 - **Fog of War & Security**: Hidden skills (`WALL`, `BOMB`, `COUNTER`, unrevealed `PIERCE`) remain confidential via `sanitizeForViewer`. Previews & AI operate on sanitized states.
-- **Tailwind SSOT**: Tailwind CSS v4 `@theme` in `src/global.css` is the sole design token source. Merged classes use `cn(...)`.
+- **Tailwind SSOT**: Tailwind CSS v4 `@theme` in `src/global.css` is the sole design token source. Merged classes use `cn(...)` and deterministic class sorting via `prettier-plugin-tailwindcss`.
+- **Transparent Standard Toolchain**: Uses TypeScript 6 (`tsc -b --pretty false`) and standard `@vitejs/plugin-react` without React Compiler rewriting, TypeScript 7 Native Preview (`tsgo`), or custom LSP scripts.
 - **Zod Defense**: Untrusted external data (notations, JSON) must be validated with Zod. Never use unsafe casts.
 - **Strict TypeScript & ESLint**: ESLint uses `strictTypeChecked` and `stylisticTypeChecked` with `typescript-eslint`, `noInlineConfig: true`, and Prettier formatting (`prettier-plugin-tailwindcss`, `prettier-plugin-packagejson`). Never use `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, or `/* eslint-disable */`.
-- **Strict `.npmrc` Policy**: Keep `ignore-scripts=true`, `save-exact=true`, `install-strategy=linked`, `strict-peer-deps=true`, and `engine-strict=true` in `.npmrc`. Use `npm ci` for clean installs and `npm run test:setup` (`playwright install chromium`) explicitly for browser binaries.
-- **Exact SemVer Action Pinning**: Pin GitHub Actions to exact stable SemVer tags (`@vX.Y.Z`, never `@v1` or `@v7.0`) and validate `.github/workflows/*.yml` locally with `actionlint`.
+- **Supply Chain & Cooldown Governance**: Keep `ignore-scripts=true`, `save-exact=true`, `install-strategy=linked`, `strict-peer-deps=true`, and `engine-strict=true` in `.npmrc`. Do not pin a root `engines.node` version in `package.json`; rely on dependency `engines` ranges enforced by `engine-strict=true`. Use `npm ci` for clean installs and `npm run test:setup` (`playwright install chromium`) explicitly for browser binaries. Batch toolchain updates quarterly or semi-annually with a 7-14 day cooldown window, prioritizing runtime CVEs via `npm audit --omit=dev`; keep `knip` out of `devDependencies` and run `npx knip` on demand.
+- **Exact SemVer Action Pinning**: Pin GitHub Actions to exact stable SemVer tags (`@vX.Y.Z`, never `@v1` or `@v7.0`) and run `actionlint` directly when editing `.github/workflows/*.yml`.
 
 ---
 
-## 3. Verification Ladder
+## 3. Shared Verification & Workflow Commands
 
-- **Inner Loop**: `npm run agent:verify:inner` (`npm run typecheck && npm run lint && npm run agent:lint:tailwind`)
-- **Unit Suite**: `npm run agent:test:unit` (`vitest run --project unit --reporter=tap-flat --no-color`)
-- **Unit Verification**: `npm run agent:verify:unit` (`npm run agent:verify:inner && npm run agent:test:unit`)
-- **E2E Smoke**: `npm run agent:test:e2e` (`vitest run --project e2e --reporter=tap-flat --no-color`)
-- **Unified Gate**: `npm run agent:verify:gate` (`npm run agent:verify:unit && npm run build && npm run agent:test:e2e`)
-- **Full Verification**: `npm run verify` (`typecheck`, `lint`, `format:check`, `agent:lint:tailwind`, `check:deadcode`, `vitest run`, `vite build`)
-- **Diagnostics & Formatting**: `npm run lint` (`eslint --max-warnings 0 .`), `npx prettier --write <files>`, `npm run agent:lint:ci` (`actionlint`)
+- **Inner Static Checks**: `npm run typecheck && npm run lint && npm run format:check`
+- **Auto-Fix Lint & Format**: `npm run lint:fix && npm run format`
+- **Unit Tests**: `npm run test:unit` (append `-- --reporter=tap-flat --no-color` for compact agent output)
+- **Production Build**: `npm run build`
+- **E2E Smoke Tests**: `npm run test:e2e` (Vitest Browser Mode with Playwright Chromium; append `-- --reporter=tap-flat --no-color` for compact agent output)
+- **Full Verification Gate (DoD)**: `npm run verify` (`typecheck`, `lint`, `format:check`, `build`, and `npm test`)
+- **On-Demand Audits**: `actionlint` (after workflow edits), `npx knip` (periodic deadcode audit), `npm audit --omit=dev` (runtime dependency audit)
 
 ---
 

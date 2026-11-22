@@ -110,7 +110,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["scripts/**/*.ts", "*.config.ts"],
+    files: ["*.config.ts"],
     languageOptions: {
       globals: globals.node,
     },

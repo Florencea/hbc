@@ -11,12 +11,7 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1000,
   },
-  plugins: [
-    react({
-      compiler: true,
-    }),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   test: {
     allowOnly: (process.env.CI ?? "") === "",
     silent: "passed-only",
