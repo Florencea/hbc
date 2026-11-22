@@ -20,7 +20,7 @@ Guidelines for contributors on the **`hbc`** repository (16x16 Multi-Faction Rev
 - **Headless Engine**: Absolutely NO DOM, Canvas, or React inside `src/engine/`. Tested headlessly in pure Node/TypeScript.
 - **Pure State Transitions**: `dispatch(state, action)` is pure and deterministic, returning `{ nextState, events }`.
 - **Fog of War & Security**: Hidden skills (`WALL`, `BOMB`, `COUNTER`, unrevealed `PIERCE`) remain confidential via `sanitizeForViewer`. Previews & AI operate on sanitized states.
-- **Tailwind SSOT**: Tailwind CSS v4 `@theme` in `src/global.css` is the sole design token source. Merged classes use `cn(...)` and deterministic class sorting via `prettier-plugin-tailwindcss`.
+- **Tailwind SSOT**: Tailwind CSS v4 `@theme` in `src/global.css` is the sole design token source. Conditional classes use `cn(...)` backed solely by `clsx` (without `tailwind-merge`, requiring mutually exclusive branches with zero conflicting utility classes) alongside deterministic class sorting via `prettier-plugin-tailwindcss`.
 - **Transparent Standard Toolchain**: Uses TypeScript 6 (`tsc -b --pretty false`) and standard `@vitejs/plugin-react` without React Compiler rewriting, TypeScript 7 Native Preview (`tsgo`), or custom LSP scripts.
 - **Zod Defense**: Untrusted external data (notations, JSON) must be validated with Zod. Never use unsafe casts.
 - **Strict TypeScript & ESLint**: ESLint uses `strictTypeChecked` and `stylisticTypeChecked` with `typescript-eslint`, `noInlineConfig: true`, and Prettier formatting (`prettier-plugin-tailwindcss`, `prettier-plugin-packagejson`). Never use `// @ts-ignore`, `// @ts-expect-error`, `// @ts-nocheck`, or `/* eslint-disable */`.

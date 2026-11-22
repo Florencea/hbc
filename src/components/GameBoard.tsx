@@ -22,8 +22,7 @@ import {
 } from "./FloatingCombatText.tsx";
 import {
   getLegalMarkerClass,
-  getSpecialPieceGlowClass,
-  getTeamColorClass,
+  getPieceVisualClass,
   SKILL_CONFIG,
   type GameMode,
 } from "./gameUiConstants.ts";
@@ -155,14 +154,13 @@ export function GameBoard({
                   }
                   className={cn(
                     "relative flex h-6 w-6 items-center justify-center rounded-xs transition-all sm:h-7 sm:w-7 md:h-8 md:w-8",
-                    (x + y) % 2 === 0
-                      ? "bg-emerald-900/90"
-                      : "bg-emerald-800/80",
-                    gameState.isDropPhase &&
-                      inDropZone &&
-                      ((gameMode === "PVE" ? 1 : activePlayerTeamId) === 1
+                    gameState.isDropPhase && inDropZone
+                      ? (gameMode === "PVE" ? 1 : activePlayerTeamId) === 1
                         ? "bg-emerald-800/90 ring-2 ring-zinc-300/80 ring-inset"
-                        : "bg-emerald-800/90 ring-2 ring-white/90 ring-inset"),
+                        : "bg-emerald-800/90 ring-2 ring-white/90 ring-inset"
+                      : (x + y) % 2 === 0
+                        ? "bg-emerald-900/90"
+                        : "bg-emerald-800/80",
                     gameState.isDropPhase && !inDropZone && "opacity-45",
                     isAnimating && "cursor-not-allowed",
                     !isAnimating &&
@@ -211,21 +209,12 @@ export function GameBoard({
                   {piece && (
                     <div
                       className={cn(
-                        "relative flex h-5 w-5 items-center justify-center rounded-full border shadow-xs transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7",
-                        isPreviewFlipped
-                          ? cn(
-                              getTeamColorClass(activePlayerTeamId),
-                              "scale-95 shadow-md ring-2 ring-amber-300",
-                            )
-                          : getTeamColorClass(piece.teamId),
-                        !piece.isRevealed &&
-                          !isPreviewFlipped &&
-                          piece.teamId === viewerTeamId &&
-                          "border-dashed ring-1 ring-slate-400/50",
-                        !isPreviewFlipped && getSpecialPieceGlowClass(piece),
-                        piece.skillType === "PURIFY" &&
-                          piece.duration !== undefined &&
-                          "shadow-xs ring-1 shadow-amber-500/30 ring-amber-400/80",
+                        "relative flex h-5 w-5 items-center justify-center rounded-full border transition-transform sm:h-6 sm:w-6 md:h-7 md:w-7",
+                        getPieceVisualClass(piece, {
+                          isPreviewFlipped,
+                          activePlayerTeamId,
+                          viewerTeamId,
+                        }),
                         isFlipping && "animate-piece-flip",
                         isPopping && "animate-piece-pop",
                       )}

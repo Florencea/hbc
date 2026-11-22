@@ -4,17 +4,44 @@ import type {
   Piece,
   SkillType,
 } from "../engine/index.ts";
+import { cn } from "../lib/cn.ts";
 
 export type GameMode = "PVP" | "PVE" | "AI_VS_AI";
 
-export function getTeamColorClass(teamId: number): string {
+export interface PieceVisualOptions {
+  isPreviewFlipped: boolean;
+  activePlayerTeamId: number;
+  viewerTeamId: number | null;
+}
+
+function getTeamSurfaceClass(teamId: number): string {
   if (teamId === 0) {
-    return "border-amber-400/90 bg-slate-800 text-amber-300 ring-1 ring-amber-500/50 shadow-md";
+    return "border-amber-400/90 bg-slate-800 text-amber-300";
   }
   if (teamId === 1) {
-    return "border-zinc-400/90 bg-linear-to-br from-zinc-800 via-zinc-900 to-black text-zinc-100 shadow-[inset_0_1px_2px_rgba(255,255,255,0.45),0_3px_6px_rgba(0,0,0,0.9)] ring-1 ring-zinc-300/60";
+    return "border-zinc-400/90 bg-linear-to-br from-zinc-800 via-zinc-900 to-black text-zinc-100";
   }
-  return "border-zinc-300 bg-linear-to-br from-white via-zinc-100 to-zinc-200 text-zinc-900 shadow-[inset_0_1px_2px_rgba(255,255,255,1),0_3px_6px_rgba(0,0,0,0.35)] ring-1 ring-zinc-300/80";
+  return "border-zinc-300 bg-linear-to-br from-white via-zinc-100 to-zinc-200 text-zinc-900";
+}
+
+function getTeamShadowClass(teamId: number): string {
+  if (teamId === 0) {
+    return "shadow-md";
+  }
+  if (teamId === 1) {
+    return "shadow-[inset_0_1px_2px_rgba(255,255,255,0.45),0_3px_6px_rgba(0,0,0,0.9)]";
+  }
+  return "shadow-[inset_0_1px_2px_rgba(255,255,255,1),0_3px_6px_rgba(0,0,0,0.35)]";
+}
+
+function getTeamRingClass(teamId: number): string {
+  if (teamId === 0) {
+    return "ring-1 ring-amber-500/50";
+  }
+  if (teamId === 1) {
+    return "ring-1 ring-zinc-300/60";
+  }
+  return "ring-1 ring-zinc-300/80";
 }
 
 export function getTeamName(teamId: number): string {
@@ -112,7 +139,7 @@ export const SKILL_CONFIG: Record<SkillType, SkillVisualConfig> = {
   },
 };
 
-export function getSpecialPieceGlowClass(piece: Piece | MaskedPiece): string {
+function getSpecialPieceGlowClass(piece: Piece | MaskedPiece): string {
   if (!piece.isRevealed || piece.skillType === "NONE") return "";
   switch (piece.skillType) {
     case "WALL":
@@ -128,6 +155,47 @@ export function getSpecialPieceGlowClass(piece: Piece | MaskedPiece): string {
     default:
       return "";
   }
+}
+
+function getPieceRimClass(
+  piece: Piece | MaskedPiece,
+  options: PieceVisualOptions,
+): string {
+  if (options.isPreviewFlipped) {
+    return "scale-95 shadow-md ring-2 ring-amber-300";
+  }
+  if (piece.skillType === "PURIFY" && piece.duration !== undefined) {
+    return cn(
+      !piece.isRevealed &&
+        piece.teamId === options.viewerTeamId &&
+        "border-dashed",
+      "shadow-xs ring-1 shadow-amber-500/30 ring-amber-400/80",
+    );
+  }
+  if (piece.isRevealed && piece.skillType !== "NONE") {
+    return getSpecialPieceGlowClass(piece);
+  }
+  if (!piece.isRevealed && piece.teamId === options.viewerTeamId) {
+    return cn(
+      "border-dashed",
+      getTeamShadowClass(piece.teamId),
+      "ring-1 ring-slate-400/50",
+    );
+  }
+  return cn(getTeamShadowClass(piece.teamId), getTeamRingClass(piece.teamId));
+}
+
+export function getPieceVisualClass(
+  piece: Piece | MaskedPiece,
+  options: PieceVisualOptions,
+): string {
+  const displayTeamId = options.isPreviewFlipped
+    ? options.activePlayerTeamId
+    : piece.teamId;
+  return cn(
+    getTeamSurfaceClass(displayTeamId),
+    getPieceRimClass(piece, options),
+  );
 }
 
 export const SKILL_OPTIONS: { type: SkillType; label: string }[] = [

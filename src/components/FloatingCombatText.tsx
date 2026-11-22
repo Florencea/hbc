@@ -27,7 +27,7 @@ function getVariantBadgeClass(variant: CombatTextVariant): string {
     case "pierce":
       return "border-cyan-300/95 bg-cyan-950/95 text-cyan-200 shadow-[0_0_18px_rgba(56,189,248,0.75)] ring-1 ring-cyan-300/60";
     default:
-      return "";
+      return "shadow-lg";
   }
 }
 
@@ -54,7 +54,7 @@ export function FloatingCombatText({
           >
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase shadow-lg backdrop-blur-xs sm:text-xs",
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase backdrop-blur-xs sm:text-xs",
                 getVariantBadgeClass(item.variant),
               )}
             >
