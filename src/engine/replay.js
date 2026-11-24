@@ -1,0 +1,607 @@
+import { z } from "zod";
+import { createInitialGame, dispatch } from "./pipeline.js";
+import { sanitizeForViewer } from "./sanitize.js";
+
+/**
+ * Metadata for a recorded HBC match.
+ */
+
+/**
+ * A single step record in the match history.
+ */
+
+/**
+ * Complete serializable match history container.
+ */
+
+/**
+ * Replay Session interface for stepping through a recorded match.
+ */
+
+/**
+ * Live tracker for building match history as actions are dispatched.
+ */
+
+/**
+ * Converts a 0-indexed coordinate into an algebraic string (e.g. {x: 0, y: 0} -> "A1", {x: 7, y: 7} -> "H8").
+ * Board columns are mapped A-P for 16x16, rows are 1-indexed (1-16).
+ */
+export function coordToAlgebraic(coord) {
+  const colChar = String.fromCharCode(65 + coord.x);
+  const rowNum = coord.y + 1;
+  return `${colChar}${rowNum.toString()}`;
+}
+
+/**
+ * Parses an algebraic coordinate string (e.g. "H8", "a1", "P16") into a 0-indexed Coord.
+ */
+export function algebraicToCoord(algebraic) {
+  const trimmed = algebraic.trim().toUpperCase();
+  const match = /^([A-P])([1-9]|1[0-6])$/.exec(trimmed);
+  if (
+    match?.[1] === undefined ||
+    match[1] === "" ||
+    match[2] === undefined ||
+    match[2] === ""
+  ) {
+    throw new Error(`Invalid algebraic coordinate: "${algebraic}"`);
+  }
+  const col = match[1].charCodeAt(0) - 65;
+  const row = parseInt(match[2], 10) - 1;
+  return { x: col, y: row };
+}
+
+/**
+ * Formats a game action and resulting events into an HBC-PGN notation string.
+ * Example: "1. P1:H8[NONE] {flips:2}" or "2. P2:PASS"
+ */
+export function formatActionNotation(action, events, moveNumber) {
+  const prefix = moveNumber !== undefined ? `${moveNumber.toString()}. ` : "";
+
+  if (action.type === "PASS_TURN") {
+    return `${prefix}P${action.playerId.toString()}:PASS`;
+  }
+
+  const coordStr = coordToAlgebraic(action.coord);
+  const skill = action.skillType ?? "NONE";
+  const baseNotation = `${prefix}P${action.playerId.toString()}:${coordStr}[${skill}]`;
+
+  // Aggregate event summary annotations
+  const annotations = [];
+  let totalFlips = 0;
+  let wallBlocks = 0;
+  let penetrations = 0;
+  let bombDetonations = 0;
+  let bombAffected = 0;
+  let counterTriggers = 0;
+  let counterReversed = 0;
+  let purifyPulses = 0;
+  let purifyAffected = 0;
+  let isPioneer = false;
+
+  for (const ev of events) {
+    switch (ev.type) {
+      case "FLIP_BATCH":
+        totalFlips += ev.coords.length;
+        break;
+      case "RAYCAST_BLOCKED":
+        wallBlocks += 1;
+        break;
+      case "PIECE_REVEALED":
+        if (ev.reason === "PENETRATE") penetrations += 1;
+        break;
+      case "BOMB_TRIGGERED":
+        bombDetonations += 1;
+        bombAffected += ev.blastCoords.length;
+        break;
+      case "COUNTER_TRIGGERED":
+        counterTriggers += 1;
+        counterReversed += ev.reversedCoords.length;
+        break;
+      case "PURIFY_PULSE":
+        purifyPulses += 1;
+        purifyAffected += ev.affectedCoords.length;
+        break;
+      case "PIONEER_PLACED":
+        isPioneer = true;
+        break;
+      case "PIECE_PLACED":
+      case "TURN_CHANGED":
+      case "SKILL_ACQUIRED":
+      case "FORCED_SPECIAL_TRIGGERED":
+      case "GAME_OVER":
+      case "DROP_PHASE_STARTED":
+      case "DROP_PHASE_ENDED":
+        break;
+    }
+  }
+
+  if (isPioneer) annotations.push("pioneer:1");
+  if (totalFlips > 0) annotations.push(`flips:${totalFlips.toString()}`);
+  if (wallBlocks > 0) annotations.push(`block:${wallBlocks.toString()}`);
+  if (penetrations > 0)
+    annotations.push(`penetrate:${penetrations.toString()}`);
+  if (bombDetonations > 0) {
+    annotations.push(
+      `bomb:${bombDetonations.toString()}(${bombAffected.toString()})`,
+    );
+  }
+  if (counterTriggers > 0) {
+    annotations.push(
+      `counter:${counterTriggers.toString()}(${counterReversed.toString()})`,
+    );
+  }
+  if (purifyPulses > 0) {
+    annotations.push(
+      `purify:${purifyPulses.toString()}(${purifyAffected.toString()})`,
+    );
+  }
+
+  if (annotations.length > 0) {
+    return `${baseNotation} {${annotations.join(",")}}`;
+  }
+  return baseNotation;
+}
+
+const INFINITY_TOKEN = "__HBC_INFINITY__";
+
+function jsonInfinityReplacer(_key, value) {
+  if (value === Infinity) {
+    return INFINITY_TOKEN;
+  }
+  return value;
+}
+
+function jsonInfinityReviver(key, value) {
+  if (value === INFINITY_TOKEN) {
+    return Infinity;
+  }
+  if (key === "NONE" && value === null) {
+    return Infinity;
+  }
+  return value;
+}
+
+/**
+ * Deep clones a GameState object while correctly preserving `Infinity` hand values.
+ */
+function cloneGameState(state) {
+  return structuredClone(state);
+}
+
+/**
+ * Serializes match history to a structured JSON string with full state snapshots.
+ */
+export function serializeMatchHistoryToJson(history) {
+  return JSON.stringify(history, jsonInfinityReplacer, 2);
+}
+
+const MatchMetadataSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  mapPreset: z.enum(["CROSSROADS", "ARCHIPELAGO", "TRENCHES"]),
+  boardSize: z.number(),
+  players: z.array(
+    z.object({
+      id: z.number(),
+      teamId: z.number(),
+      name: z.string(),
+    }),
+  ),
+  winnerTeamId: z.number().nullable(),
+  totalTurns: z.number(),
+  isGameOver: z.boolean(),
+});
+
+const MatchStepRecordSchema = z.object({
+  stepIndex: z.number(),
+  turnNumber: z.number(),
+  playerId: z.number(),
+  action: z.custom(
+    (val) => typeof val === "object" && val !== null && "type" in val,
+  ),
+  events: z.array(
+    z.custom((val) => typeof val === "object" && val !== null && "type" in val),
+  ),
+  notation: z.string(),
+  stateSnapshot: z.custom(
+    (val) => typeof val === "object" && val !== null && "board" in val,
+  ),
+});
+
+const MatchHistorySchema = z.object({
+  metadata: MatchMetadataSchema,
+  initialState: z.custom(
+    (val) => typeof val === "object" && val !== null && "board" in val,
+  ),
+  steps: z.array(MatchStepRecordSchema),
+});
+
+/**
+ * Deserializes a JSON string back into a full MatchHistory object.
+ */
+export function deserializeMatchHistoryFromJson(jsonStr) {
+  const parsed = JSON.parse(jsonStr, jsonInfinityReviver);
+  const result = MatchHistorySchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error("Invalid HBC match history JSON: missing required fields");
+  }
+  return result.data;
+}
+
+/**
+ * Formats match result for standard PGN headers.
+ */
+function formatResult(metadata) {
+  if (!metadata.isGameOver) {
+    return "*";
+  }
+  if (metadata.winnerTeamId === 1) {
+    return "1-0";
+  }
+  if (metadata.winnerTeamId === 2) {
+    return "0-1";
+  }
+  return "1/2-1/2";
+}
+
+/**
+ * Serializes match history into standard HBC-PGN format.
+ */
+export function serializeToHbcPgn(history) {
+  const meta = history.metadata;
+  const p1Name = meta.players.find((p) => p.teamId === 1)?.name ?? "Black";
+  const p2Name = meta.players.find((p) => p.teamId === 2)?.name ?? "White";
+
+  const headers = [
+    `[Event "HBC Strategic Match"]`,
+    `[Site "HBC Headless Engine"]`,
+    `[Date "${meta.date.split("T")[0] ?? meta.date}"]`,
+    `[Round "1"]`,
+    `[MapPreset "${meta.mapPreset}"]`,
+    `[BoardSize "${meta.boardSize.toString()}"]`,
+    `[Team1 "${p1Name}"]`,
+    `[Team2 "${p2Name}"]`,
+    `[Result "${formatResult(meta)}"]`,
+    `[TotalTurns "${meta.totalTurns.toString()}"]`,
+  ];
+
+  const moveTexts = history.steps.map((step) => step.notation);
+
+  return `${headers.join("\n")}\n\n${moveTexts.join(" ")}\n`;
+}
+
+/**
+ * Parsed representation of an HBC-PGN string.
+ */
+
+/**
+ * Parses an HBC-PGN string into tag headers and an ordered list of actions.
+ */
+export function parseHbcPgn(pgnString) {
+  const headers = {};
+  const lines = pgnString.split(/\r?\n/);
+  const bodyLines = [];
+  let inHeaders = true;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (inHeaders) {
+      if (trimmed.startsWith("[")) {
+        const headerMatch = /^\s*\[([A-Za-z0-9_]+)\s+"([^"]*)"\]\s*$/.exec(
+          trimmed,
+        );
+        if (
+          headerMatch?.[1] !== undefined &&
+          headerMatch[1] !== "" &&
+          headerMatch[2] !== undefined
+        ) {
+          headers[headerMatch[1]] = headerMatch[2];
+        }
+      } else if (trimmed === "") {
+        inHeaders = false;
+      } else {
+        inHeaders = false;
+        bodyLines.push(line);
+      }
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  const moveBody = bodyLines.join("\n");
+
+  const mapPresetRaw = headers.MapPreset;
+  let mapPreset = "CROSSROADS";
+  if (
+    mapPresetRaw === "CROSSROADS" ||
+    mapPresetRaw === "ARCHIPELAGO" ||
+    mapPresetRaw === "TRENCHES"
+  ) {
+    mapPreset = mapPresetRaw;
+  }
+
+  const boardSizeRaw = headers.BoardSize;
+  const boardSize =
+    boardSizeRaw !== undefined && boardSizeRaw !== ""
+      ? parseInt(boardSizeRaw, 10)
+      : 16;
+
+  // Regex to match:
+  // e.g. "1. P1:H8[NONE] {flips:2}" or "P1:H8[WALL]" or "P2:PASS"
+  const tokenRegex =
+    /(?:(\d+)\.\s*)?P(\d+):([A-Za-z](?:1[0-6]|[1-9])|PASS)(?:\[([A-Z]+)\])?(?:\s*\{[^}]*\})?/gi;
+
+  const actions = [];
+  let tokenMatch;
+
+  while ((tokenMatch = tokenRegex.exec(moveBody)) !== null) {
+    const playerId = parseInt(tokenMatch[2] ?? "1", 10);
+    const target = tokenMatch[3]?.toUpperCase();
+    const skillRaw = tokenMatch[4]?.toUpperCase();
+
+    if (target === "PASS") {
+      actions.push({
+        type: "PASS_TURN",
+        playerId,
+      });
+    } else if (target !== undefined && target !== "") {
+      const coord = algebraicToCoord(target);
+      const skillType =
+        skillRaw === "WALL" ||
+        skillRaw === "PIERCE" ||
+        skillRaw === "BOMB" ||
+        skillRaw === "PURIFY" ||
+        skillRaw === "COUNTER"
+          ? skillRaw
+          : "NONE";
+
+      actions.push({
+        type: "PLACE_PIECE",
+        playerId,
+        coord,
+        skillType,
+      });
+    }
+  }
+
+  return {
+    headers,
+    mapPreset,
+    boardSize,
+    actions,
+  };
+}
+
+/**
+ * Deterministically replays a sequence of actions from the initial game state,
+ * constructing a complete MatchHistory with state snapshots and generated events.
+ */
+export function replayMatchActions(mapPreset, boardSize, actions) {
+  const initial = createInitialGame({ mapPreset, boardSize });
+  let currentState = initial.state;
+
+  const metadata = {
+    id: `replay-${Date.now().toString()}`,
+    date: new Date().toISOString(),
+    mapPreset,
+    boardSize,
+    players: initial.state.players.map((p) => ({
+      id: p.id,
+      teamId: p.teamId,
+      name: p.name,
+    })),
+    winnerTeamId: null,
+    totalTurns: 0,
+    isGameOver: false,
+  };
+
+  const steps = [];
+
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    if (!action) continue;
+
+    const { nextState, events } = dispatch(currentState, action);
+    const stepNotation = formatActionNotation(action, events, i + 1);
+
+    steps.push({
+      stepIndex: i,
+      turnNumber: nextState.currentTurn,
+      playerId: action.playerId,
+      action,
+      events,
+      notation: stepNotation,
+      stateSnapshot: cloneGameState(nextState),
+    });
+
+    currentState = nextState;
+  }
+
+  metadata.totalTurns = steps.length;
+  metadata.isGameOver = currentState.isGameOver;
+  metadata.winnerTeamId = currentState.winnerTeamId;
+
+  const history = {
+    metadata,
+    initialState: cloneGameState(initial.state),
+    steps,
+  };
+
+  return { history, finalState: currentState };
+}
+
+/**
+ * Creates a ReplaySession controller for stepping through recorded matches.
+ */
+export function createReplaySession(history, initialIndex) {
+  const totalSteps = history.steps.length;
+  let currentIndex =
+    initialIndex !== undefined
+      ? Math.max(-1, Math.min(totalSteps - 1, initialIndex))
+      : totalSteps - 1;
+
+  return {
+    getHistory() {
+      return history;
+    },
+
+    getCurrentIndex() {
+      return currentIndex;
+    },
+
+    getTotalSteps() {
+      return totalSteps;
+    },
+
+    getCurrentStep() {
+      if (currentIndex < 0 || currentIndex >= totalSteps) {
+        return null;
+      }
+      return history.steps[currentIndex] ?? null;
+    },
+
+    getCurrentState() {
+      if (currentIndex < 0 || totalSteps === 0) {
+        return history.initialState;
+      }
+      const step = history.steps[currentIndex];
+      return step ? step.stateSnapshot : history.initialState;
+    },
+
+    getCurrentMaskedState(viewerPlayerId) {
+      const state = this.getCurrentState();
+      if (viewerPlayerId === undefined || viewerPlayerId === null) {
+        return state;
+      }
+      return sanitizeForViewer(state, viewerPlayerId);
+    },
+
+    canStepForward() {
+      return currentIndex < totalSteps - 1;
+    },
+
+    canStepBackward() {
+      return currentIndex > -1;
+    },
+
+    stepForward() {
+      if (currentIndex >= totalSteps - 1) {
+        return null;
+      }
+      currentIndex += 1;
+      const step = history.steps[currentIndex];
+      if (!step) return null;
+      return { state: step.stateSnapshot, step };
+    },
+
+    stepBackward() {
+      if (currentIndex <= -1) {
+        return null;
+      }
+      currentIndex -= 1;
+      if (currentIndex === -1) {
+        return { state: history.initialState, step: null };
+      }
+      const step = history.steps[currentIndex];
+      if (!step) return null;
+      return { state: step.stateSnapshot, step };
+    },
+
+    jumpToStep(index) {
+      currentIndex = Math.max(-1, Math.min(totalSteps - 1, index));
+      if (currentIndex === -1) {
+        return { state: history.initialState, step: null };
+      }
+      const step = history.steps[currentIndex];
+      return {
+        state: step ? step.stateSnapshot : history.initialState,
+        step: step ?? null,
+      };
+    },
+
+    jumpToStart() {
+      currentIndex = -1;
+      return history.initialState;
+    },
+
+    jumpToEnd() {
+      currentIndex = totalSteps - 1;
+      return this.getCurrentState();
+    },
+  };
+}
+
+/**
+ * Creates a MatchTracker instance for recording live moves as they occur.
+ */
+export function createMatchTracker(initialState, matchId) {
+  let history = {
+    metadata: {
+      id: matchId ?? `match-${Date.now().toString()}`,
+      date: new Date().toISOString(),
+      mapPreset: initialState.mapPreset,
+      boardSize: initialState.size,
+      players: initialState.players.map((p) => ({
+        id: p.id,
+        teamId: p.teamId,
+        name: p.name,
+      })),
+      winnerTeamId: initialState.winnerTeamId,
+      totalTurns: 0,
+      isGameOver: initialState.isGameOver,
+    },
+    initialState: cloneGameState(initialState),
+    steps: [],
+  };
+
+  return {
+    recordStep(action, nextState, events) {
+      const stepIndex = history.steps.length;
+      const notation = formatActionNotation(action, events, stepIndex + 1);
+      const stateSnapshot = cloneGameState(nextState);
+
+      const stepRecord = {
+        stepIndex,
+        turnNumber: nextState.currentTurn,
+        playerId: action.playerId,
+        action,
+        events,
+        notation,
+        stateSnapshot,
+      };
+
+      history.steps.push(stepRecord);
+      history.metadata.totalTurns = history.steps.length;
+      history.metadata.isGameOver = nextState.isGameOver;
+      history.metadata.winnerTeamId = nextState.winnerTeamId;
+
+      return stepRecord;
+    },
+
+    getHistory() {
+      return history;
+    },
+
+    reset(newInitialState, newMatchId) {
+      history = {
+        metadata: {
+          id: newMatchId ?? `match-${Date.now().toString()}`,
+          date: new Date().toISOString(),
+          mapPreset: newInitialState.mapPreset,
+          boardSize: newInitialState.size,
+          players: newInitialState.players.map((p) => ({
+            id: p.id,
+            teamId: p.teamId,
+            name: p.name,
+          })),
+          winnerTeamId: newInitialState.winnerTeamId,
+          totalTurns: 0,
+          isGameOver: newInitialState.isGameOver,
+        },
+        initialState: cloneGameState(newInitialState),
+        steps: [],
+      };
+    },
+  };
+}

@@ -1,0 +1,138 @@
+import {
+  playBlockSound,
+  playBombSound,
+  playCounterSound,
+  playFlipSound,
+  playPierceSound,
+  playPlaceSound,
+  playPurifySound,
+  playGameOverSound,
+} from "./sound.js";
+
+const defaultDelay = async (ms) => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+};
+
+async function playEventStep(event, handlers, delay) {
+  switch (event.type) {
+    case "PIECE_PLACED": {
+      handlers.onPiecePlaced?.(event.coord, event.piece);
+      playPlaceSound();
+      await delay(100);
+      break;
+    }
+
+    case "PIONEER_PLACED": {
+      handlers.onPioneerPlaced?.(event.coord, event.piece);
+      playPlaceSound();
+      await delay(150);
+      break;
+    }
+
+    case "RAYCAST_BLOCKED": {
+      const wallCoord = event.wallPos ?? event.coord;
+      handlers.onRaycastBlocked?.(wallCoord);
+      handlers.onAddFloatingText?.("翡翠城壁 格擋！", wallCoord, "blocked");
+      playBlockSound();
+      await delay(500);
+      break;
+    }
+
+    case "PIECE_REVEALED": {
+      handlers.onPieceRevealed?.(event.coord, event.skillType, event.reason);
+      if (event.skillType === "PIERCE") {
+        handlers.onPierceTriggered?.(event.coord);
+        handlers.onAddFloatingText?.(
+          "天空守望者 貫穿！",
+          event.coord,
+          "pierce",
+        );
+        playPierceSound();
+        await delay(450);
+      }
+      break;
+    }
+
+    case "FLIP_BATCH": {
+      const playBatchFlipStep = async (index) => {
+        if (index >= event.coords.length) return;
+        const coord = event.coords[index];
+        if (coord !== undefined) {
+          handlers.onPieceFlip?.(coord, event.toTeamId);
+          playFlipSound();
+          await delay(70);
+        }
+        await playBatchFlipStep(index + 1);
+      };
+      await playBatchFlipStep(0);
+      break;
+    }
+
+    case "COUNTER_TRIGGERED": {
+      handlers.onTriggerScreenFlash?.("purple", 350);
+      await delay(180); // Hitstop
+
+      handlers.onCounterTriggered?.(
+        event.coord,
+        event.reversedCoords,
+        event.defenderTeamId,
+      );
+      handlers.onAddFloatingText?.("深淵復仇者 反擊！", event.coord, "counter");
+      playCounterSound();
+      await delay(520);
+      break;
+    }
+
+    case "BOMB_TRIGGERED": {
+      handlers.onTriggerScreenShake?.(350);
+      handlers.onBombTriggered?.(event.coord, event.blastCoords, event.teamId);
+      handlers.onAddFloatingText?.("殺戮盛宴 引爆！", event.coord, "bomb");
+      playBombSound();
+      await delay(650);
+      break;
+    }
+
+    case "PURIFY_PULSE": {
+      handlers.onPurifyPulse?.(event.coord, event.affectedCoords, event.teamId);
+      handlers.onAddFloatingText?.("救贖之光 淨化！", event.coord, "purify");
+      playPurifySound();
+      await delay(650);
+      break;
+    }
+
+    case "GAME_OVER": {
+      handlers.onGameOver?.(event.winnerTeamId);
+      playGameOverSound();
+      await delay(200);
+      break;
+    }
+
+    case "TURN_CHANGED":
+    case "SKILL_ACQUIRED":
+    case "FORCED_SPECIAL_TRIGGERED":
+    case "DROP_PHASE_STARTED":
+    case "DROP_PHASE_ENDED":
+      break;
+  }
+}
+
+/**
+ * Executes a sequence of game events with choreographed animation delays,
+ * visual callbacks, and synchronized audio playback.
+ */
+export async function playEvents(events, handlers) {
+  const delay = handlers.delayFn ?? defaultDelay;
+
+  const playNext = async (index) => {
+    if (index >= events.length) return;
+    const event = events[index];
+    if (event !== undefined) {
+      await playEventStep(event, handlers, delay);
+    }
+    await playNext(index + 1);
+  };
+
+  await playNext(0);
+}

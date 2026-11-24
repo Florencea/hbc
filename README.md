@@ -1,19 +1,19 @@
 # HBC - Multi-Team Reversi Game Engine
 
-A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend for **HBC**: a Multi-Team Reversi / Othello variant featuring 5 unique skills, hidden traps, and recursive chain reactions.
+A headless 16x16 game engine and zero-framework vanilla JavaScript + modern CSS frontend for **HBC**: a Multi-Team Reversi / Othello variant featuring 5 unique skills, hidden traps, and recursive chain reactions.
 
 - **Live Demo**: [https://florencea.github.io/hbc/](https://florencea.github.io/hbc/)
 
 ## Core Architecture
 
-- **Headless Engine First**: Zero DOM, Canvas, React, or UI framework dependencies inside `src/engine/`. Pure TypeScript deterministic state transitions.
+- **Headless Engine First**: Zero DOM, Canvas, or UI framework dependencies inside `src/engine/`. Pure ESM JavaScript deterministic state transitions with `zod` boundary validation (`src/engine/replay.js`).
 - **Pure State Transitions & Event Sourcing**:
-  ```ts
-  dispatch(state: GameState, action: Action): { nextState: GameState; events: GameEvent[] }
+  ```js
+  dispatch(state, action); // -> { nextState, events }
   ```
 - **Information Security (Fog of War) & Anti-Sonar Probing**:
-  ```ts
-  sanitizeForViewer(state: GameState, viewerPlayerId: number): MaskedGameState
+  ```js
+  sanitizeForViewer(state, viewerPlayerId); // -> MaskedGameState
   ```
   Masks unrevealed enemy trap pieces to `NONE` on the client side to prevent DevTools inspection. Client move indicators (`getAvailableMoves`) and hover previews strictly evaluate against sanitized states, preventing players from probing hidden `WALL` pieces by toggling `PIERCE`. The engine supports optimistic blind moves: placements perceived as legal that hit hidden walls resolve with wall reveals, 0 flips, and turn advances without throwing errors.
 - **5-Skill Variant System**:
@@ -22,8 +22,8 @@ A high-performance, headless game engine and React 19 + TailwindCSS v4 frontend 
   - `BOMB`: 3x3 explosive detonation upon being flipped/captured, converting surrounding tiles and chaining adjacent bombs and counters.
   - `PURIFY`: Turn-end 3x3 cleansing pulse that converts tiles without triggering traps (lasts 3 turns).
   - `COUNTER`: Reverses the active flip batch back to defender faction upon being captured by non-PIERCE pieces.
-- **Standard Vite + React 19**: Bundled via Vite 8 and official `@vitejs/plugin-react` without React Compiler rewriting.
-- **TailwindCSS v4**: Design tokens defined in `src/global.css` (`@theme`) and deterministically sorted via `prettier-plugin-tailwindcss`.
+- **Zero-Framework Frontend & Modern Web Standards**: Only `zod` is shipped in runtime `dependencies`. UI modules in `src/ui/` use persistent 256-cell DOM updates, native `<dialog closedby="any">` modals, `[popover="manual"]` top-layer toasts, `<progress>` / `<output>` / `<dl>` / `<ol>` semantics, `File.text()`, `AbortController`, and layered modern CSS (`@layer`, `color-mix(in oklch, ...)`, CSS Nesting, `@container`, `@starting-style`, `transition-behavior: allow-discrete`).
+- **Zero-Plugin Vite + Native Node Testing**: Bundled via plain Vite 8, unit-tested via Node built-in `node:test` + `node:assert/strict`, and smoke-tested via Playwright Chromium against `vite preview`.
 
 ## Roadmap & Milestones
 
@@ -51,15 +51,11 @@ The project enforces a strict `.npmrc` policy (`ignore-scripts=true`, `save-exac
 
 ### Inner Static Checks
 
-Run during active coding and refactoring for fast feedback:
-
 ```bash
-npm run typecheck && npm run lint && npm run format:check
+npm run lint && npm run format:check
 ```
 
 ### Complete Verification Gate (`verify`)
-
-Run the complete Definition of Done before staging or deploying:
 
 ```bash
 npm run verify
@@ -67,13 +63,10 @@ npm run verify
 
 Executes:
 
-1. `typecheck` (`tsc -b --pretty false`, TypeScript 6)
-2. `lint` (ESLint `strictTypeChecked` + `stylisticTypeChecked`, `--max-warnings 0`)
-3. `format:check` (Prettier formatting and Tailwind CSS v4 class sorting check)
-4. `build` (Vite 8 production bundle verification)
-5. `test` (Vitest `unit` & Playwright Chromium Browser `e2e` tests)
-
-For compact non-interactive agent output on test suites, append `-- --reporter=tap-flat --no-color` to `npm run test:unit` or `npm run test:e2e`.
+1. `lint` (ESLint `@eslint/js`, `--max-warnings 0`, `noInlineConfig: true`)
+2. `format:check` (Prettier default formatting check)
+3. `build` (Vite 8 production bundle verification)
+4. `test` (Node built-in `node:test` unit suite and Playwright Chromium E2E smoke suite)
 
 ### Deployment Workflow
 
@@ -82,21 +75,20 @@ For compact non-interactive agent output on test suites, append `-- --reporter=t
 
 ## Available Commands & Scripts
 
-| Script                 | Description                                                                       |
-| :--------------------- | :-------------------------------------------------------------------------------- |
-| `npm run dev`          | Start local Vite development server                                               |
-| `npm run build`        | Build production bundle with Vite                                                 |
-| `npm run preview`      | Preview production build locally                                                  |
-| `npm run typecheck`    | Run TypeScript 6 project build checks (`tsc -b --pretty false`)                   |
-| `npm run lint`         | Run strict ESLint checks (`--max-warnings 0`)                                     |
-| `npm run lint:fix`     | Run ESLint auto-fix                                                               |
-| `npm run format`       | Format files and sort Tailwind classes with Prettier                              |
-| `npm run format:check` | Verify formatting and Tailwind class ordering with Prettier                       |
-| `npm test`             | Run all Vitest projects (`unit` and `e2e`)                                        |
-| `npm run test:unit`    | Run Vitest unit test project                                                      |
-| `npm run test:e2e`     | Run Vitest Browser Mode (`@vitest/browser-playwright`) E2E project                |
-| `npm run test:setup`   | Install Playwright Chromium browser binaries                                      |
-| `npm run verify`       | Complete verification gate (`typecheck`, `lint`, `format:check`, `build`, `test`) |
+| Script                 | Description                                                          |
+| :--------------------- | :------------------------------------------------------------------- |
+| `npm run dev`          | Start local Vite development server                                  |
+| `npm run build`        | Build production bundle with Vite                                    |
+| `npm run preview`      | Preview production build locally                                     |
+| `npm run lint`         | Run ESLint checks (`--max-warnings 0`)                               |
+| `npm run lint:fix`     | Run ESLint auto-fix                                                  |
+| `npm run format`       | Format files with Prettier                                           |
+| `npm run format:check` | Verify formatting with Prettier                                      |
+| `npm test`             | Run both `test:unit` and `test:e2e`                                  |
+| `npm run test:unit`    | Run pure Node unit test suite (`node --test`)                        |
+| `npm run test:e2e`     | Run Playwright Chromium E2E smoke tests (`node --test`)              |
+| `npm run test:setup`   | Install Playwright Chromium browser binaries                         |
+| `npm run verify`       | Complete verification gate (`lint`, `format:check`, `build`, `test`) |
 
 ## Guidelines
 
